@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ล่ามเชลล์</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐧</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="logo">🐧 <b>ล่ามเชลล์</b> <span>LamShell</span></div>
+  <div class="hright"><span id="total"></span><span id="ai" class="ai">AI …</span></div>
+</header>
+<main>
+  <aside>
+    <section class="lvcard">
+      <div class="lvtop"><span id="lvid"></span><span id="lvstars"></span></div>
+      <h1 id="lvtitle"></h1>
+      <div id="lvphase" class="muted"></div>
+      <div class="missionbox"><div class="label">🎯 ภารกิจ</div><div id="mission"></div></div>
+      <div class="actions">
+        <button id="hint"></button>
+        <button id="reset" title="รีเซ็ตโลกของด่านนี้">⏪ ย้อนเวลา</button>
+      </div>
+      <div id="hintnote" class="muted small"></div>
+    </section>
+    <section>
+      <div class="label">ด่านทั้งหมด</div>
+      <div id="map"></div>
+    </section>
+    <section>
+      <div class="label">การ์ดคำสั่ง</div>
+      <div id="cards"></div>
+    </section>
+    <button id="wipe" class="linkbtn">ล้างความคืบหน้า</button>
+  </aside>
+  <div class="termwrap">
+    <div id="term">
+      <div id="lines"></div>
+      <div class="inrow"><span id="pcwd" class="pcwd"></span><span id="plabel" class="plabel"></span><input id="cmd" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    </div>
+    <div id="overlay" class="overlay"></div>
+  </div>
+</main>
+<script type="module" src="js/game.js"></script>
+</body>
+</html>

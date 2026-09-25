@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Start the LamShell server if it isn't running, then open the game in the browser.
+DIR="$(dirname "$(readlink -f "$0")")"
+URL=http://127.0.0.1:4011/
+if ! curl -s -o /dev/null "$URL/api/health"; then
+  setsid nohup python3 "$DIR/server.py" >"$DIR/server.log" 2>&1 &
+  for _ in $(seq 20); do curl -s -o /dev/null "$URL/api/health" && break; sleep 0.2; done
+fi
+xdg-open "$URL" >/dev/null 2>&1 &
+echo "LamShell: $URL"
