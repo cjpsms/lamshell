@@ -2,7 +2,7 @@ import { baseFS, sizeOf } from './vfs.js';
 import { Shell } from './shell.js';
 import { decode } from './decoder.js';
 import { interpret, aiStatus, hasThai, fromKedmanee } from './translate.js';
-import { LEVELS, PHASES } from './levels.js';
+import { LEVELS, PHASES, STRICT, PHASE_ORDER, phaseLabel } from './levels.js';
 
 const WHO = {
   lam: ['น้องล่าม', '🐧'], kru: ['ครูสมใจ', '👩‍🏫'], root: ['พี่รูท', '🧑‍💻'],
@@ -15,8 +15,9 @@ const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&
 
 // ---------- progress (per-browser convenience) ----------
 const SAVE_KEY = 'lamshell.progress.v1';
-let progress = { unlocked: 0, stars: {}, cards: [] };
+let progress = { unlocked: 0, stars: {}, cards: [], seen: {} };
 try { Object.assign(progress, JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); } catch {}
+progress.seen ||= {};
 const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch {} };
 
 // ---------- terminal ----------
@@ -37,7 +38,7 @@ function ansi(text) {
   parts.forEach((p, i) => {
     if (i % 2 === 0) { out += esc(p); return; }
     if (open) { out += '</span>'; open = false; }
-    const cls = { '1;34': 'a-blue', '1;31': 'a-red', '32': 'a-green', '90': 'a-gray' }[p];
+    const cls = { '1;34': 'a-blue', '1;31': 'a-red', '1;32': 'a-exe', '32': 'a-green', '90': 'a-gray' }[p];
     if (cls) { out += `<span class="${cls}">`; open = true; }
   });
   return out + (open ? '</span>' : '');
@@ -79,6 +80,22 @@ import('./stage.js').then(m => {
   stage = m;
   earlyLines.splice(0).forEach(a => m.speak(...a));
 }).catch(e => console.warn('stage off:', e));
+
+const SCENE_NAMES = { intro: 'เปิดเรื่อง: ปี 2050', nowake: 'น้องล่ามไม่ตื่น', ending: 'ตอนจบ' };
+// Story cutscenes (full screen, 3D). Also optional: without them the levels still play.
+const cutscenes = import('./cutscene.js').catch(e => { console.warn('cutscenes off:', e); return null; });
+async function cutscene(name) {
+  const m = await cutscenes;
+  if (!m) return;
+  await m.playCutscene(name);
+  progress.seen[name] = true;
+  save();
+  renderSide();
+  input.focus();
+}
+
+// น้องล่าม is knocked out from phase 4 until she wakes at the end of phase 5.
+const lamAsleep = () => STRICT.has(L.lv.phase) && !(L.passed && L.lv.lamWakes);
 
 function moodFor(who, text) {
   if (who === 'virus') return 'happy';      // smug
@@ -207,7 +224,7 @@ async function loadLevel(idx, { replay = false } = {}) {
   const lv = LEVELS[idx];
   const fs = baseFS();
   lv.setup(fs);
-  const sh = new Shell(fs, io, { cwd: lv.cwd, password: lv.password || 'pass123' });
+  const sh = new Shell(fs, io, { cwd: lv.cwd, password: lv.password || 'pass123', programs: lv.programs });
   L = { idx, lv, fs, sh, hist: [], attempts: 0, aiUsed: 0, typedReal: false, hint: 0, decoderOpened: false, passed: false, shownPower: false };
   // A question left open in the previous level (sudo password, y/n) must not swallow this level's first command.
   // Drop it without resolving: resolving would let the old level's command carry on and print into this one.
@@ -218,9 +235,12 @@ async function loadLevel(idx, { replay = false } = {}) {
   earlyLines.length = 0;
   renderSide();
   setPrompt();
+  if (lv.cutsceneBefore && !progress.seen[lv.cutsceneBefore] && !replay) await cutscene(lv.cutsceneBefore);
+  if (L.lv !== lv) return;   // the player picked another level during the scene
+  stage?.setAsleep(lamAsleep());
   const first = LEVELS.findIndex(x => x.phase === lv.phase) === idx;
   sys('📍 ' + lv.place);
-  if (first && !replay) sys(`— เฟส ${lv.phase === 'B' ? 'สะพาน' : lv.phase}: ${PHASES[lv.phase].name} — ${PHASES[lv.phase].lam}`, 'phase');
+  if (first && !replay) sys(`— ${phaseLabel(lv.phase)}: ${PHASES[lv.phase].name} — ${PHASES[lv.phase].lam}`, 'phase');
   if (replay) sys('⏪ ย้อนเวลาแล้ว โลกกลับเป็นเหมือนตอนเริ่มด่าน', 'phase');
   else for (const [who, t] of lv.intro) { say(who, t); await sleep(250); }
   input.focus();
@@ -268,7 +288,7 @@ async function handle(text) {
       return;
     }
     const rest = text.slice(first.length);
-    if (!hasThai(rest)) { L.typedReal = true; return runAndHelp(text); }
+    if (!hasThai(rest) && !humanWords(rest)) { L.typedReal = true; return runAndHelp(text); }
     return translateAndRun(text);
   }
 
@@ -277,11 +297,24 @@ async function handle(text) {
   if (hasThai(text)) kedmaneeHint(text);
 }
 
+// Phase 3 lets the part after the command be human language, English included (`mkdir create projects/x`).
+// A word counts as human only if it's on this list and isn't a real name here (a file in this folder or a
+// name from the mission), so `mkdir backup` still runs as typed.
+const HUMAN_EN = new Set(('create make new all every everything each file files folder folders directory dir hidden ' +
+  'secret show list see find search look inside into in to from the a an and with named called name big bigger large ' +
+  'larger than small copy move delete remove rename go back home up down whole entire nested layers deep please ' +
+  'including include also only just here there it them this that of for').split(' '));
+function humanWords(rest) {
+  const here = L.fs.get(L.sh.cwd);
+  const names = new Set([...Object.keys(here?.kids || {}), ...(L.lv.mission.match(/[A-Za-z0-9_.\-]+/g) || [])]);
+  return rest.split(/\s+/).some(w => HUMAN_EN.has(w.toLowerCase()) && !names.has(w));
+}
+
 function kedmaneeHint(text) {
   const conv = fromKedmanee(text);
   const w = conv.split(/\s+/)[0];
   if (conv !== text && KNOWN.has(w)) {
-    say(L.lv.phase >= 4 || L.lv.phase === 'B' ? 'root' : 'lam', `ลืมเปลี่ยนภาษาคีย์บอร์ดหรือเปล่า? (${text.split(/\s+/)[0]} = ${w})  ลองกด Super+Space / ปุ่มเปลี่ยนภาษา แล้วพิมพ์ ${conv} ใหม่`);
+    say(STRICT.has(L.lv.phase) ? 'root' : 'lam', `ลืมเปลี่ยนภาษาคีย์บอร์ดหรือเปล่า? (${text.split(/\s+/)[0]} = ${w})  ลองกด Super+Space / ปุ่มเปลี่ยนภาษา แล้วพิมพ์ ${conv} ใหม่`);
     return true;
   }
   return false;
@@ -374,7 +407,7 @@ async function run(line, translated = false) {
   L.hist.push(res);
   L.attempts++;
   const phase = L.lv.phase;
-  if (phase === 4 || phase === 'B') add(`[exit ${res.code}]`, 'code');
+  if (STRICT.has(phase)) add(`[exit ${res.code}]`, 'code');
   renderDecoder(res.stderr);
   if (L.sh.flags.wiped) return wipedScene();
   if (L.sh.flags.poweroff && !L.shownPower) { L.shownPower = true; await powerScene(); }
@@ -394,7 +427,7 @@ function renderDecoder(stderr) {
   if (!items.length) return;
   const phase = L.lv.phase;
   const box = d => {
-    const full = phase === 1 || phase === 2 || phase === 4 || phase === 'B';
+    const full = phase === 1 || phase === 2 || STRICT.has(phase);
     const rows = full
       ? `<span class="k who">ใครบ่น</span><span>${esc(d.who || '-')}</span>` +
         (d.what ? `<span class="k what">เรื่องอะไร</span><span>${esc(d.what)}</span>` : '') +
@@ -403,7 +436,7 @@ function renderDecoder(stderr) {
     return `<div class="dec"><div class="grid">${rows}</div>${d.tip && full ? `<div class="tip">» ${esc(d.tip)}</div>` : ''}</div>`;
   };
   const html = items.slice(0, 3).map(box).join('');
-  if (phase === 4 || phase === 'B') {
+  if (STRICT.has(phase)) {
     const el = note(`<button class="book">📖 เปิดสมุดน้องล่าม</button>`, 'decwrap');
     el.querySelector('button').onclick = () => {
       L.decoderOpened = true;
@@ -443,8 +476,8 @@ function checkLevel() {
   if (L.lv.check(g)) return pass();
   // The command worked but the mission isn't done: say so, because a silent success looks like nothing happened.
   const r = g.res;
-  if (r && r.code !== 0 && L.lv.errNudge) {
-    const n = L.lv.errNudge(g);
+  if (r && r.code !== 0) {
+    const n = (L.lv.errNudge && L.lv.errNudge(g)) || (STRICT.has(L.lv.phase) && findPatternHint(r));
     if (n && n !== L.lastNudge) { L.lastNudge = n; say([1, 2, 3].includes(L.lv.phase) ? 'lam' : 'root', n); }
   }
   if (!r || r.code !== 0) return;
@@ -462,6 +495,14 @@ function checkLevel() {
   }
 }
 
+// `find . "*.mua"`: find took the pattern as a second place to search. Phases 1-3 get this from Haiku's fix;
+// in the strict phases พี่รูท says it (a short rule, not the full answer).
+function findPatternHint(r) {
+  const m = /^find: '([^']+)': No such file or directory$/m.exec(r.stderr);
+  if (!m || !r.cmds.some(c => c.name === 'find') || !/[*?]|\.\w+$/.test(m[1])) return '';
+  return `find เข้าใจว่า '${m[1]}' คือที่ที่จะเข้าไปค้น ไม่ใช่ชื่อที่หา ลืม -name หรือเปล่า? รูปแบบคือ find <ค้นที่ไหน> -name "<ชื่อ>"`;
+}
+
 // Levenshtein distance, small strings only.
 function editDist(a, b) {
   const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
@@ -474,7 +515,27 @@ function editDist(a, b) {
 
 // Created something whose name is *almost* a name from the mission (scores.cvs vs scores.csv)?
 // The command succeeded silently, so without this the player just sees "not passed" and no reason.
+// Built a mission path in the wrong place? e.g. `cd projects` then `mkdir -p projects/2569/science`
+// makes projects/projects/2569/science. Mission paths count from the level's starting folder.
+function wrongPlaceHint(r) {
+  const paths = (L.lv.mission.match(/[A-Za-z0-9_.\-]+(?:\/[A-Za-z0-9_.\-]+)+/g) || []);
+  const created = (r.created || []).map(p => p.replace(/\/$/, ''));
+  for (const w of paths) {
+    const right = L.lv.cwd + '/' + w;
+    if (L.fs.exists(right)) continue;
+    const bad = created.find(p => p.endsWith('/' + w) && p !== right);
+    if (!bad || L.placeSaid?.has(bad)) continue;
+    (L.placeSaid ||= new Set()).add(bad);
+    const where = L.sh.pretty(bad), from = L.sh.pretty(L.lv.cwd);
+    if (STRICT.has(L.lv.phase)) say('root', `ไปสร้างไว้ที่ ${where} ซ้อนผิดชั้น path ในภารกิจนับจาก ${from} ดู prompt ว่าตอนนี้อยู่ไหน`);
+    else say('lam', `เอ๊ะ ไปได้ ${where} ซ้อนกันผิดที่ เพราะตอนสั่งเราอยู่ใน ${L.sh.pretty()} แล้ว path ในภารกิจนับจาก ${from} นะ ลอง cd กลับไปที่ ${from} ก่อนแล้วสั่งใหม่`);
+    return true;
+  }
+  return false;
+}
+
 function typoHint(r) {
+  if (wrongPlaceHint(r)) return true;
   const wanted = [...new Set(L.lv.mission.match(/[A-Za-z0-9_][A-Za-z0-9_.\-]{2,}/g) || [])];
   for (const p of r.created || []) {
     const name = p.replace(/\/$/, '').split('/').pop();
@@ -483,7 +544,7 @@ function typoHint(r) {
     if (!near || L.typoSaid?.has(name)) continue;
     (L.typoSaid ||= new Set()).add(name);
     const where = L.sh.pretty(p.replace(/\/$/, ''));
-    if (L.lv.phase === 4 || L.lv.phase === 'B') say('root', `เพิ่งสร้าง ${where} แต่ภารกิจบอก ${near} อ่านชื่อทีละตัวดีๆ`);
+    if (STRICT.has(L.lv.phase)) say('root', `เพิ่งสร้าง ${where} แต่ภารกิจบอก ${near} อ่านชื่อทีละตัวดีๆ`);
     else say('lam', `เอ๊ะ เพิ่งสร้าง ${where} ขึ้นมา แต่ภารกิจบอกว่า ${near} นะ ชื่อต่างกันนิดเดียว เครื่องถือว่าเป็นคนละไฟล์เลย ลองดูชื่อด้วย ls แล้วแก้ด้วย mv`);
     return true;
   }
@@ -541,6 +602,9 @@ async function pass() {
   for (const c of L.lv.cards || []) if (!progress.cards.includes(c)) progress.cards.push(c);
   save();
   for (const [who, t] of L.lv.outro || []) { await sleep(200); say(who, t); }
+  if (L.lv.lamSleeps) stage?.setAsleep(true);
+  if (L.lv.cutsceneAfter) { await sleep(L.lv.outro?.length ? 2500 : 600); await cutscene(L.lv.cutsceneAfter); }
+  stage?.setAsleep(lamAsleep() || !!L.lv.lamSleeps);
   const cards = (L.lv.cards || []).map(c => `<span class="cardchip">${esc(c)}</span>`).join(' ');
   const el = note(`<div class="passbox"><div class="pt">✅ ผ่านด่าน ${esc(id)}</div>` +
     (cards ? `<div>ได้การ์ดคำสั่ง ${cards}</div>` : '') +
@@ -609,7 +673,7 @@ function renderSide() {
   const lv = L.lv;
   $('#lvid').textContent = lv.id + (lv.boss ? ' · บอส' : '');
   $('#lvtitle').textContent = lv.title;
-  $('#lvphase').textContent = lv.phase === 'B' ? 'ด่านสะพาน · ' + PHASES.B.name : `เฟส ${lv.phase} · ${PHASES[lv.phase].name}`;
+  $('#lvphase').textContent = `${phaseLabel(lv.phase)} · ${PHASES[lv.phase].name}`;
   $('#mission').textContent = lv.mission;
   renderSteps();
   const best = progress.stars[lv.id] || 0;
@@ -623,11 +687,10 @@ function renderSide() {
   // level map
   const map = $('#map');
   map.innerHTML = '';
-  const groups = [1, 2, 3, 4, 'B'];
-  for (const ph of groups) {
+  for (const ph of PHASE_ORDER) {
     const g = document.createElement('div');
     g.className = 'mapgroup';
-    g.innerHTML = `<div class="mg">${ph === 'B' ? 'สะพาน' : 'เฟส ' + ph}</div>`;
+    g.innerHTML = `<div class="mg">${phaseLabel(ph)}</div>`;
     const row = document.createElement('div');
     row.className = 'mrow';
     LEVELS.forEach((x, i) => {
@@ -644,6 +707,10 @@ function renderSide() {
     g.appendChild(row);
     map.appendChild(g);
   }
+  // The opening is always watchable; later scenes unlock once seen in play.
+  const scenes = Object.keys(SCENE_NAMES).filter(k => k === 'intro' || progress.seen[k]);
+  $('#scenes').innerHTML = scenes.map(k => `<button class="scenebtn" data-scene="${k}">▶ ${esc(SCENE_NAMES[k])}</button>`).join('');
+  $('#scenes').querySelectorAll('button').forEach(b => { b.onclick = () => cutscene(b.dataset.scene); });
   $('#cards').innerHTML = progress.cards.length ? progress.cards.map(c => `<span class="cardchip">${esc(c)}</span>`).join('') : '<span class="muted">ยังไม่มีการ์ด</span>';
   const total = Object.values(progress.stars).reduce((a, b) => a + b, 0);
   $('#total').textContent = `★ ${total}/${LEVELS.length * 3}`;

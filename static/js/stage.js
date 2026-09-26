@@ -10,6 +10,8 @@ const MODELS = {
 };
 const IMAGES = {};   // 2D fallback per character, if a model is ever missing
 const MOODS = ['happy', 'angry', 'sad', 'surprised', 'relaxed'];
+// Bones any animation may touch (stage idle or cutscenes); restPose() zeroes them.
+export const POSED = ['hips', 'spine', 'chest', 'neck', 'head', 'leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'leftHand', 'rightHand'];
 export const IDLE_FACE = { lam: { happy: 0.45 } };   // expression weights while standing idle
 
 let box, canvas, img, nameEl, renderer, scene, camera, clock;
@@ -20,6 +22,8 @@ let talkUntil = 0, mood = 'neutral';
 let nextBlink = 2, blinkT = -1;
 const queue = [];
 let playing = false;
+let lent = false;          // a cutscene has borrowed the models
+let asleep = false;        // story: น้องล่าม is knocked out (phase 4 until she wakes in 5-7)
 
 export function initStage(el) {
   box = el;
@@ -92,7 +96,7 @@ async function play() {
   playing = false;
 }
 
-function load(who) {
+export function load(who) {
   if (!cache[who]) {
     const loader = new GLTFLoader();
     loader.register(p => new VRMLoaderPlugin(p));
@@ -110,8 +114,11 @@ function load(who) {
 }
 
 // Exported models stand in a T-pose; drop the arms so the bust shot looks natural.
-function restPose(vrm) {
+export function restPose(vrm) {
   const b = n => vrm.humanoid.getNormalizedBoneNode(n);
+  for (const name of POSED) { const n = b(name); if (n) n.rotation.set(0, 0, 0); }
+  vrm.scene.position.set(0, 0, 0);
+  vrm.scene.rotation.set(0, 0, 0);
   b('leftUpperArm').rotation.z = -1.25;
   b('rightUpperArm').rotation.z = 1.25;
   b('leftLowerArm').rotation.z = -0.1;
@@ -119,6 +126,7 @@ function restPose(vrm) {
 }
 
 function showVRM(vrm) {
+  if (lent) return;
   if (cur !== vrm) {
     if (cur) scene.remove(cur.scene);
     scene.add(vrm.scene);
@@ -164,12 +172,13 @@ const ease = (a, b, k) => a + (b - a) * k;
 
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.1), t = clock.elapsedTime;
-  if (!cur || canvas.hidden) return;
+  if (!cur || canvas.hidden || lent) return;
   const em = cur.expressionManager;
   const talking = performance.now() < talkUntil;
+  const sleeping = asleep && curWho === 'lam' && !talking;
 
   // Talking: the line's mood. Standing idle: น้องล่าม smiles, everyone else goes neutral.
-  const idle = !talking && IDLE_FACE[curWho];
+  const idle = sleeping ? { relaxed: 0.35 } : !talking && IDLE_FACE[curWho];
   for (const k of MOODS) {
     const target = talking ? (k === mood ? 0.6 : 0) : idle && idle[k] || 0;
     em.setValue(k, ease(em.getValue(k), target, 0.06));
@@ -178,7 +187,8 @@ function tick() {
   em.setValue('aa', ease(em.getValue('aa'), open, 0.45));
   em.setValue('oh', ease(em.getValue('oh'), talking ? 0.25 * Math.max(0, Math.sin(t * 7.3)) : 0, 0.3));
 
-  if (t > nextBlink) { blinkT = 0; nextBlink = t + 2 + Math.random() * 3.5; }
+  if (sleeping) { em.setValue('blink', ease(em.getValue('blink'), 1, 0.1)); blinkT = -1; }
+  else if (t > nextBlink) { blinkT = 0; nextBlink = t + 2 + Math.random() * 3.5; }
   if (blinkT >= 0) {
     blinkT += dt;
     em.setValue('blink', blinkT < 0.07 ? blinkT / 0.07 : Math.max(0, 1 - (blinkT - 0.07) / 0.09));
@@ -186,10 +196,18 @@ function tick() {
   }
 
   const bone = n => cur.humanoid.getNormalizedBoneNode(n);
-  bone('chest').rotation.x = Math.sin(t * 1.7) * 0.015;
-  bone('neck').rotation.y = Math.sin(t * 0.45) * 0.06;
-  bone('head').rotation.z = Math.sin(t * 0.7) * 0.03;
-  bone('head').rotation.x = talking ? Math.sin(t * 5) * 0.025 : ease(bone('head').rotation.x, 0, 0.1);
+  if (sleeping) {   // head drooped, slow breathing
+    bone('chest').rotation.x = 0.06 + Math.sin(t * 0.9) * 0.02;
+    bone('neck').rotation.y = ease(bone('neck').rotation.y, 0, 0.05);
+    bone('head').rotation.z = ease(bone('head').rotation.z, 0.14, 0.05);
+    bone('head').rotation.x = ease(bone('head').rotation.x, 0.38, 0.05);
+  } else {
+    bone('chest').rotation.x = Math.sin(t * 1.7) * 0.015;
+    bone('neck').rotation.y = Math.sin(t * 0.45) * 0.06;
+    bone('head').rotation.z = Math.sin(t * 0.7) * 0.03;
+    bone('head').rotation.x = talking ? Math.sin(t * 5) * 0.025 : ease(bone('head').rotation.x, 0, 0.1);
+  }
+  box.classList.toggle('asleep', sleeping);
 
   cur.update(dt);
   renderer.render(scene, camera);
@@ -197,3 +215,19 @@ function tick() {
 
 // New level: drop lines still waiting from the previous one.
 export function clearQueue() { queue.length = 0; cutLine?.(); talkUntil = 0; }
+
+export function setAsleep(v) { asleep = !!v; }
+
+// Cutscenes borrow the VRMs (an object can only live in one scene): stop drawing and hand them over.
+export function lend() {
+  clearQueue();
+  lent = true;
+  if (cur) scene.remove(cur.scene);
+}
+export function giveBack() {
+  lent = false;
+  for (const p of Object.values(cache)) p.then(v => { restPose(v); MOODS.forEach(k => v.expressionManager.setValue(k, 0)); }).catch(() => {});
+  const v = cur;
+  cur = null;
+  (v ? Promise.resolve(v) : load(curWho)).then(showVRM).catch(() => {});
+}

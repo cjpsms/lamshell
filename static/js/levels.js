@@ -50,12 +50,18 @@ export const PHASES = {
   3: { name: 'ชื่อจริง ไส้ภาษาคน', prompt: 'cmd>', lam: 'น้องล่ามเสียงแหบ แปลได้แค่ "ไส้ใน"' },
   4: { name: 'เป๊ะทุกตัว', prompt: '$', lam: 'น้องล่ามหลับไปฟื้นพลัง เหลือแค่สมุดถอดรหัส' },
   B: { name: 'ท่อ ถัง และสายพาน', prompt: '$', lam: 'พี่รูทพาลงโรงงานท่อใต้ดิน' },
+  R: { name: 'กู้น้องล่าม', prompt: '$', lam: 'ไวรัสลากน้องล่ามไปขังไว้ ไปพาน้องกลับมากัน' },
+  5: { name: 'ภารกิจประยุกต์', prompt: '$', lam: 'น้องล่ามยังไม่ตื่น ช่วยครูไปก่อน แล้วค่อยปลุกน้อง' },
 };
+// Phases where the player types exact syntax with no AI help (the decoder hides behind a button).
+export const STRICT = new Set([4, 'B', 'R', 5]);
+export const PHASE_ORDER = [1, 2, 3, 4, 'B', 'R', 5];
+export const phaseLabel = ph => ph === 'B' ? 'ด่านสะพาน' : ph === 'R' ? 'ภารกิจกู้ภัย' : 'เฟส ' + ph;
 
 export const LEVELS = [
   // ================= PHASE 1 =================
   {
-    id: '1-1', phase: 1, title: 'ตื่นมาในห้องคอม', place: 'ห้องคอม ม.4/2 — 07:12 น.', cwd: S,
+    id: '1-1', phase: 1, cutsceneBefore: 'intro', title: 'ตื่นมาในห้องคอม', place: 'ห้องคอม ม.4/2 — 07:12 น.', cwd: S,
     setup: fs => school(fs), aliases: P1_ALIASES,
     intro: [
       ['lam', 'เฮ้! เราชื่อน้องล่าม เป็นล่ามประจำเครื่องป้าเซิร์ฟ 🐧'],
@@ -323,7 +329,7 @@ export const LEVELS = [
     outro: [['lam', 'เยี่ยม! "ดูก่อนลบ" คือนิสัยมือโปร คำสั่งแบบมือโปรคือ find . -type f -size +50M -name "junk*" -delete']],
   },
   {
-    id: '3-8', phase: 3, boss: true, title: 'มินิบอส: ห้องเซิร์ฟเวอร์', place: 'หน้าห้องเซิร์ฟเวอร์', cwd: S, password: 'pass123',
+    id: '3-8', phase: 3, boss: true, lamSleeps: true, title: 'มินิบอส: ห้องเซิร์ฟเวอร์', place: 'หน้าห้องเซิร์ฟเวอร์', cwd: S, password: 'pass123',
     setup: fs => fs.tree(S, {
       'server_room/': {
         '__ro': true,
@@ -514,9 +520,145 @@ export const LEVELS = [
     hint1: ['cat', '|', 'xargs rm'], solution: 'cat big_list.txt | xargs rm', cards: ['xargs'],
     check: g => !g.fs.exists(HOME + '/Downloads/ubuntu.iso') && !g.fs.exists(HOME + '/Downloads/movie_night.mp4') && !g.fs.exists(HOME + '/Downloads/old_backup.zip') && g.fs.exists(HOME + '/Downloads/song.mp3') && g.hist.some(r => r.line.includes('xargs')),
     fail: g => (!g.fs.exists(HOME + '/Downloads/song.mp3') || !g.fs.exists(HOME + '/Downloads/homework.pdf')) && 'ไฟล์ที่ไม่อยู่ในรายการหายไปด้วย! กด "ย้อนเวลา"',
-    outro: [['root', 'ถ้า xargs จบด้วย [123] แปลว่ามีคำสั่งที่มันสั่งไปพังอย่างน้อยหนึ่งตัว และระวังชื่อไฟล์มีช่องว่าง xargs จะหั่นเป็นสองชื่อ'], ['root', 'จบด่านสะพานแล้ว! เฟส 5 (ภารกิจประยุกต์) กับบอสใหญ่กำลังตามมา']],
+    outro: [['root', 'ถ้า xargs จบด้วย [123] แปลว่ามีคำสั่งที่มันสั่งไปพังอย่างน้อยหนึ่งตัว และระวังชื่อไฟล์มีช่องว่าง xargs จะหั่นเป็นสองชื่อ'], ['root', 'จบด่านสะพานแล้ว! เครื่องมือครบแล้ว ได้เวลาไปพาน้องล่ามกลับมา']],
+  },
+
+  // ================= RESCUE: get น้องล่าม out of the virus's quarantine =================
+  {
+    id: 'R1', phase: 'R', title: 'ตามหาน้องล่าม', place: 'เซิร์ฟเวอร์ป้าเซิร์ฟ', cwd: HOME,
+    setup: fs => quarantine(fs),
+    intro: [['root', 'ไวรัสลากน้องล่ามที่หลับอยู่ไปขังไว้ที่ไหนสักแห่งในเครื่อง โฟลเดอร์ของน้องชื่อขึ้นต้นด้วย nong'], ['virus', 'หาให้เจอสิ ข้าซ่อนไว้ในที่ที่มนุษย์ไม่กล้าเข้า 👾']],
+    mission: 'หาว่าโฟลเดอร์ของน้องล่าม (ชื่อขึ้นต้นด้วย nong) ถูกขังอยู่ที่ไหนในเครื่อง',
+    steps: [['ค้นทั้งเครื่อง หาชื่อที่ขึ้นต้นด้วย nong', g => sawOut(g, '/quarantine/nong_lam')]],
+    hint1: ['find /', '-name "nong*"', '2>/dev/null'], solution: 'find / -name "nong*" 2>/dev/null', cards: ['find -name "x*"'],
+    check: g => sawOut(g, '/quarantine/nong_lam'),
+    errNudge: g => /Permission denied/.test(g.res.stderr) && !g.res.stdout.includes('nong') && 'ค้นทั้งเครื่องถูกแล้ว แต่ต้องบอกชื่อด้วย -name และถ้ารู้แค่ต้นชื่อ ใช้ "nong*" (ดอกจัน = อะไรก็ได้ต่อจากนี้)',
+    outro: [['root', 'เจอแล้ว! /quarantine ห้องกักกันของไวรัส'], ['virus', 'เจอก็ไม่ได้แปลว่าจะเข้าได้นะ 👾']],
+  },
+  {
+    id: 'R2', phase: 'R', title: 'กับดักหน้าห้องขัง', place: '/quarantine', cwd: HOME,
+    setup: fs => quarantine(fs),
+    intro: [['root', 'หน้าห้องขังมีกับดัก .mua วางเต็มไปหมด ลบให้หมดก่อน แต่ห้ามแตะโฟลเดอร์น้องล่ามเด็ดขาด'], ['root', 'ห้องนี้เป็นของ root และดูก่อนลบทุกครั้งนะ']],
+    mission: 'ลบไฟล์ .mua ทั้งหมดใน /quarantine โดยที่ nong_lam ต้องอยู่ครบ',
+    steps: [
+      ['ดูรายชื่อกับดักก่อนลบ (เฉพาะ .mua)', g => g.hist.some(r => r.stdout.includes('trap_01.mua') && r.stdout.trim().split('\n').every(l => l.includes('.mua')))],
+      [g => `ลบกับดัก .mua ทั้งหมด (${TRAPS.filter(p => !g.fs.exists(p)).length}/${TRAPS.length})`, g => TRAPS.every(p => !g.fs.exists(p))],
+      ['น้องล่ามยังอยู่ครบ', g => TRAPS.every(p => !g.fs.exists(p)) && lamIntact(g.fs, '/quarantine/nong_lam')],
+    ],
+    hint1: ['find', '-name "*.mua"', '-print', '-delete', 'sudo'], solution: 'sudo find /quarantine -name "*.mua" -print → sudo find /quarantine -name "*.mua" -delete', cards: ['find -delete'],
+    check: g => TRAPS.every(p => !g.fs.exists(p)) && lamIntact(g.fs, '/quarantine/nong_lam'),
+    fail: g => !lamIntact(g.fs, '/quarantine/nong_lam') && 'ไฟล์ของน้องล่ามหายไปด้วย! กด "ย้อนเวลา"',
+    errNudge: g => /Permission denied/.test(g.res.stderr) && g.res.cmds.some(c => ['rm', 'find'].includes(c.name) && !c.sudo) && 'ห้องขังเป็นของ root ลบของในนั้นต้องขอสิทธิ์แอดมินก่อน',
+    outro: [['root', 'กับดักหมดแล้ว ทางสะดวก']],
+  },
+  {
+    id: 'R3', phase: 'R', title: 'พาน้องออกมา', place: '/quarantine', cwd: HOME,
+    setup: fs => quarantine(fs, { traps: false }),
+    intro: [['root', 'ย้ายโฟลเดอร์น้องล่ามออกมาไว้ที่บ้านเรา (~) ห้องขังเป็นของ root ต้องใช้สิทธิ์แอดมิน']],
+    mission: 'ย้าย /quarantine/nong_lam มาไว้ในบ้านของเรา (~)',
+    steps: [
+      ['พาน้องล่ามออกจากห้องขัง', g => !g.fs.exists('/quarantine/nong_lam')],
+      ['น้องล่ามมาอยู่ที่ ~/nong_lam ครบทุกไฟล์', g => lamIntact(g.fs, HOME + '/nong_lam')],
+    ],
+    hint1: ['mv', 'sudo', '~'], solution: 'sudo mv /quarantine/nong_lam ~/', cards: ['sudo mv'],
+    check: g => !g.fs.exists('/quarantine/nong_lam') && lamIntact(g.fs, HOME + '/nong_lam'),
+    fail: g => !g.fs.exists('/quarantine/nong_lam') && !g.fs.exists(HOME + '/nong_lam') && 'น้องล่ามหายไปไหนแล้ว? ดูว่าย้ายไปผิดที่หรือเปล่า (ls) หรือกด "ย้อนเวลา"',
+    nudge: g => g.fs.exists('/quarantine/nong_lam') && g.fs.isDir(HOME + '/nong_lam') && 'ก๊อปออกมาแล้ว แต่ตัวจริงยังติดอยู่ในห้องขัง ภารกิจนี้ต้อง "ย้าย"',
+    errNudge: g => /Permission denied/.test(g.res.stderr) && g.res.cmds.some(c => c.name === 'mv' && !c.sudo) && 'ห้องขังเป็นของ root ย้ายของออกต้องขอสิทธิ์แอดมินก่อน',
+    outro: [['root', 'น้องออกมาแล้ว!']],
+  },
+  {
+    id: 'R4', phase: 'R', title: 'ปลุกน้องล่าม', place: 'บ้านของเรา', cwd: HOME,
+    setup: fs => quarantine(fs, { traps: false, moved: true }),
+    get programs() { return WAKE; },   // getter: WAKE is defined further down
+    intro: [['root', 'ในโฟลเดอร์น้องมีสคริปต์ปลุก wake.sh อยู่ เข้าไปแล้วสั่งรันมันเลย'], ['root', 'ไฟล์ที่รันได้จะเป็นสีเขียวตอน ls']],
+    mission: 'เข้าไปในโฟลเดอร์ nong_lam แล้วรันสคริปต์ wake.sh เพื่อปลุกน้องล่าม',
+    steps: [
+      ['เข้าไปในโฟลเดอร์ nong_lam', g => g.sh.cwd === HOME + '/nong_lam' || !!g.sh.flags.wakeTried],
+      ['รัน wake.sh', g => !!g.sh.flags.wakeTried],
+    ],
+    hint1: ['cd', './'], solution: 'cd nong_lam → ./wake.sh', cards: ['./'],
+    check: g => !!g.sh.flags.wakeTried,
+    errNudge: g => /wake(\.sh)?: command not found/.test(g.res.stderr) && 'ไฟล์ในโฟลเดอร์ที่เราอยู่ต้องรันด้วย ./ ข้างหน้า เช่น ./wake.sh (เครื่องหาคำสั่งแค่ในที่เก็บโปรแกรม ไม่หาในโฟลเดอร์ที่เราอยู่)',
+    cutsceneAfter: 'nowake',
+    outro: [],
+  },
+
+  // ================= PHASE 5 (final level; 5-1..5-6 helping ครูสมใจ are still to come) =================
+  {
+    id: '5-7', phase: 5, boss: true, title: 'ปลุกน้องล่าม (อีกครั้ง)', place: 'บ้านของเรา', cwd: HOME,
+    setup: fs => quarantine(fs, { traps: false, moved: true }),
+    get programs() { return WAKE; },   // getter: WAKE is defined further down
+    intro: [
+      ['root', 'พี่หาเจอแล้ว สมองของน้อง (~/nong_lam/brain) มีไฟล์ .block ของไวรัสอุดอยู่'],
+      ['root', 'ลบ .block ให้หมด แต่ความทรงจำของน้อง (.dat) ห้ามหายแม้แต่ไฟล์เดียว ดูก่อนลบนะ แล้วค่อยรัน wake.sh อีกรอบ'],
+      ['kru', 'ขอบใจที่ช่วยงานครูมาตลอดนะ ตาน้องล่ามแล้ว'],
+    ],
+    mission: 'ลบไฟล์ .block ทั้งหมดใน ~/nong_lam/brain (ความทรงจำ .dat ต้องอยู่ครบ) แล้วรัน wake.sh อีกครั้ง',
+    steps: [
+      ['ดูรายชื่อไฟล์ .block ก่อนลบ', g => g.hist.some(r => r.stdout.includes('jam_01.block') && !r.stdout.includes('memory_'))],
+      [g => `ลบไฟล์ .block ทั้งหมด (${BLOCKS.filter(p => !g.fs.exists(p)).length}/${BLOCKS.length})`, g => BLOCKS.every(p => !g.fs.exists(p))],
+      ['ความทรงจำ .dat อยู่ครบ', g => BLOCKS.every(p => !g.fs.exists(p)) && MEMORIES.every(p => g.fs.exists(p))],
+      ['รัน wake.sh อีกครั้ง', g => !!g.sh.flags.woke],
+    ],
+    hint1: ['find', '-name "*.block"', '-print', '-delete', 'sudo', './wake.sh'],
+    solution: 'sudo find ~/nong_lam/brain -name "*.block" -print → sudo find ~/nong_lam/brain -name "*.block" -delete → cd ~/nong_lam → ./wake.sh', cards: [],
+    check: g => !!g.sh.flags.woke && MEMORIES.every(p => g.fs.exists(p)),
+    fail: g => !MEMORIES.every(p => g.fs.exists(p)) && 'ความทรงจำของน้องล่ามหายไปด้วย! (ระวัง *block* จะโดน favorite_block_game.dat ด้วย) กด "ย้อนเวลา"',
+    errNudge: g => /Permission denied/.test(g.res.stderr) && g.res.cmds.some(c => ['rm', 'find'].includes(c.name) && !c.sudo) && 'โฟลเดอร์ของน้องยังเป็นของ root (ย้ายมาด้วย sudo) ลบต้องขอสิทธิ์แอดมิน',
+    cutsceneAfter: 'ending', lamWakes: true,
+    outro: [],
   },
 ];
+
+// ---- rescue arc world: /quarantine is root's (readable, only sudo can change it) ----
+const Q = '/quarantine', LAM = 'nong_lam';
+const TRAPS = [1, 2, 3, 4, 5].map(i => `${Q}/trap_0${i}.mua`).concat(`${Q}/gate/trap_06.mua`);
+const brain = base => base + '/brain';
+const MEMORY_NAMES = ['memory_first_day.dat', 'memory_thai_words.dat', 'memory_friends.dat', 'favorite_block_game.dat'];
+const BLOCK_NAMES = [1, 2, 3, 4, 5].map(i => `jam_0${i}.block`);
+const MEMORIES = MEMORY_NAMES.map(n => `${HOME}/${LAM}/brain/${n}`);
+const BLOCKS = BLOCK_NAMES.map(n => `${HOME}/${LAM}/brain/${n}`);
+const lamIntact = (fs, base) => fs.isFile(base + '/wake.sh') && MEMORY_NAMES.every(n => fs.isFile(brain(base) + '/' + n));
+
+function quarantine(fs, { traps = true, moved = false } = {}) {
+  const lam = {
+    '__ro': true,
+    'wake.sh': { content: '#!/bin/bash\n# ปลุกน้องล่าม\ncheck brain/\nload language\nwake up', ro: true, x: true, prog: 'wake' },
+    'brain/': { '__ro': true },
+  };
+  for (const n of MEMORY_NAMES) lam['brain/'][n] = { content: 'ความทรงจำของน้องล่าม', ro: true };
+  for (const n of BLOCK_NAMES) lam['brain/'][n] = { content: '👾 block', ro: true };
+  const q = { '__ro': true, 'README.txt': { content: 'ห้องกักกัน — ไวรัสมั่วซั่ว', ro: true }, 'gate/': { '__ro': true } };
+  if (traps) {
+    for (const p of TRAPS) {
+      const rel = p.slice(Q.length + 1);
+      if (rel.startsWith('gate/')) q['gate/'][rel.slice(5)] = { content: '💣', ro: true };
+      else q[rel] = { content: '💣', ro: true };
+    }
+  }
+  if (moved) { fs.tree(Q, q); fs.tree(HOME + '/' + LAM, lam); }
+  else fs.tree(Q, { ...q, [LAM + '/']: lam });
+}
+
+// wake.sh: fails while the brain still has .block files in it (the story's "she doesn't wake up").
+const WAKE = {
+  wake(args, ctx, abs) {
+    const dir = abs.slice(0, abs.lastIndexOf('/'));
+    const b = this.fs.get(dir + '/brain');
+    const names = b && b.t === 'd' ? Object.keys(b.kids) : [];
+    const blocks = names.filter(n => n.endsWith('.block'));
+    ctx.out('[wake.sh] กำลังปลุกน้องล่าม...\n[ OK ] โหลดโมดูลภาษาไทย\n[ OK ] เชื่อมต่อ terminal\n');
+    this.flags.wakeTried = true;
+    if (blocks.length) {
+      ctx.out(`[FAIL] brain/: มีไฟล์ .block อุดอยู่ ${blocks.length} ไฟล์ น้องล่ามยังตื่นไม่ได้\n`);
+      return 1;
+    }
+    ctx.out('[ OK ] brain/: โล่งแล้ว\n[ OK ] น้องล่ามตื่นแล้ว! 🐧\n');
+    this.flags.woke = true;
+    return 0;
+  },
+};
 
 function bigFiles(fs) {
   fs.tree(S + '/storage', {

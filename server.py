@@ -56,6 +56,11 @@ SYSTEM_PROMPT = """คุณคือ "น้องล่าม" ภูตเพ
   "find ไฟล์ใหญ่เกิน 50MB" -> "find . -type f -size +50M"
   "rm ไฟล์ใหญ่เกิน 50MB" (tree มี a.iso (700M) b.txt (1K) c.mp4 (120M)) -> {"command":"rm a.iso c.mp4","parts":[{"token":"a.iso c.mp4","meaning":"ไฟล์ใหญ่เกิน 50MB"}]}
   "cp ทั้งโฟลเดอร์ club ไปไว้ใน backup" -> "cp -r club backup/"
+  ส่วนที่เหลือเป็นภาษาอังกฤษแบบคนพูดก็ได้ (create, all, hidden, into, folder...) ให้ตีความเป็นเจตนา ไม่ใช่ชื่อไฟล์
+  ยกเว้นคำนั้นเป็นชื่อที่มีจริงใน tree และตัดเครื่องหมาย "..." ออกถ้าไม่จำเป็น
+  "mkdir create \"projects/2569/science\"" -> {"command":"mkdir -p projects/2569/science","parts":[{"token":"-p","meaning":"create (สร้างให้ครบทุกชั้น)"}]}
+  "ls all hidden" -> "ls -a"
+  "cp all club into backup" -> "cp -r club backup/"
 
 ตัวอย่างเพิ่ม:
   phase 1 "มีไรอยู่ในนี้บ้างอะ" -> {"command":"ls","confidence":0.95,"explain":"ls ย่อมาจาก list = ดูว่ามีไฟล์อะไรบ้าง","parts":[],"reply":""}

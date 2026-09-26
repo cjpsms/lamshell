@@ -90,6 +90,7 @@ export class VFS {
     if (content && !content.endsWith('\n')) content += '\n';
     const n = mkfileNode(content, !!opts.priv, opts.size);
     if (opts.ro) n.ro = true;
+    if (opts.x) { n.x = true; if (opts.prog) n.prog = opts.prog; }   // executable; prog names a Shell.programs entry
     parent.kids[basename(abs)] = n;
   }
   // Build a subtree from a spec: 'name/' keys are dirs, other keys are files

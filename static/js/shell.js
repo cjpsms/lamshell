@@ -5,7 +5,7 @@ import { MAN } from './man.js';
 export const CORE = ['ls', 'cd', 'mkdir', 'cp', 'mv', 'rm', 'cat', 'find', 'sudo', 'poweroff'];
 const BUILTINS = new Set(['cd', 'pwd', 'echo', 'exit', 'help', 'clear', 'history']);
 
-const C = { dir: '\x1b[1;34m', red: '\x1b[1;31m', off: '\x1b[0m' };
+const C = { dir: '\x1b[1;34m', exe: '\x1b[1;32m', red: '\x1b[1;31m', off: '\x1b[0m' };
 
 // GNU quoting: the "always" style used by ls/cp/mv/rm/mkdir, and the "only if needed" style of cat/wc/grep.
 const qa = s => (s.includes("'") ? `"${s}"` : `'${s}'`);
@@ -138,6 +138,9 @@ export class Shell {
     this.lastCode = 0;
     this.flags = {};          // poweroff, wiped, ...
     this.trace = [];          // every simple command run: { name, args, sudo, code }
+    // Executable files (node.x) name a program here via node.prog; levels supply them (functions can't live in
+    // the FS, which must stay structuredClone-able).
+    this.programs = opts.programs || {};
   }
 
   pretty(abs = this.cwd) {
@@ -280,9 +283,15 @@ export class Shell {
     let code;
     if (!fn) {
       if (name.includes('/')) {
+        // Running a file by path, like ./wake.sh: bash's exact wording for each way it can fail.
         const n = this.fs.get(this.abs(name));
-        ctx.err(n ? `bash: ${name}: Permission denied\n` : `bash: ${name}: No such file or directory\n`);
-        code = n ? 126 : 127;
+        if (!n) { ctx.err(`bash: ${name}: No such file or directory\n`); code = 127; }
+        else if (n.t === 'd') { ctx.err(`bash: ${name}: Is a directory\n`); code = 126; }
+        else if (!n.x || (n.priv && !ctx.sudo)) { ctx.err(`bash: ${name}: Permission denied\n`); code = 126; }
+        else {
+          const prog = this.programs[n.prog];
+          code = prog ? await prog.call(this, args, ctx, this.abs(name)) : 0;
+        }
       } else {
         ctx.err(`bash: ${name}: command not found\n`);
         code = 127;
@@ -396,13 +405,13 @@ cmds.ls = function (args, ctx) {
     if (r.err) { ctx.err(`ls: cannot access ${qa(p)}: No such file or directory\n`); code = 2; continue; }
     if (r.node.t === 'd' && !o.f.has('d')) dirs.push([p, r.node]); else files.push([p, r.node]);
   }
-  const color = (name, n) => (ctx.isTTY && n.t === 'd' ? C.dir + name + C.off : name);
+  const color = (name, n) => (!ctx.isTTY ? name : n.t === 'd' ? C.dir + name + C.off : n.x ? C.exe + name + C.off : name);
   const fmtLong = entries => {
     const sz = entries.map(([, n]) => (hr ? human(sizeOf(n)) : String(sizeOf(n))));
     const w = Math.max(0, ...sz.map(s => s.length));
     return entries.map(([name, n], i) => {
       const root = n.priv || n.ro;
-      const perm = n.t === 'd' ? (n.priv ? 'drwx------' : 'drwxr-xr-x') : (n.priv ? '-rw-------' : '-rw-r--r--');
+      const perm = n.t === 'd' ? (n.priv ? 'drwx------' : 'drwxr-xr-x') : n.x ? (n.priv ? '-rwx------' : '-rwxr-xr-x') : (n.priv ? '-rw-------' : '-rw-r--r--');
       const links = n.t === 'd' ? 2 + Object.values(n.kids).filter(k => k.t === 'd').length : 1;
       const who = root ? 'root    root   ' : 'student student';
       return `${perm} ${links} ${who} ${sz[i].padStart(w)} Sep 26 07:12 ${color(name, n)}`;

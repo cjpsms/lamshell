@@ -183,6 +183,7 @@ mark { background: #4a3a14; color: var(--c-yellow); padding: 0 2px; }
 .a-blue { color: var(--c-blue); font-weight: 700; }
 .a-red { color: var(--c-red); font-weight: 700; }
 .a-green { color: var(--c-green); }
+.a-exe { color: var(--c-green); font-weight: 700; }
 .a-gray { color: var(--c-gray); }
 .ln.cmt { color: var(--c-gray); }          /* "# น้องล่ามแปล: ..." -- shell-comment style */
 .ln.cmt b { color: var(--c-yellow); font-weight: 400; }
@@ -211,3 +212,56 @@ mark { background: #4a3a14; color: var(--c-yellow); padding: 0 2px; }
   .wt-btn, .wt-ctl { display: none; }
   #term { font-size: 13.5px; }
 }
+
+/* ================= story cutscenes ================= */
+.scenes { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.scenebtn { font-size: 12px; padding: 3px 10px; border-radius: 4px; border: 1px solid #3a3a3a; background: #262626; }
+.scenebtn:hover { background: #303030; }
+.cast.asleep::after { content: 'z z Z'; position: absolute; right: 22%; top: 18%; color: #9fb4ff; font: 600 15px var(--mono); animation: zz 2.4s ease-in-out infinite; }
+@keyframes zz { 0% { opacity: 0; transform: translate(0, 6px); } 40% { opacity: .9; } 100% { opacity: 0; transform: translate(10px, -14px); } }
+
+.cs { position: fixed; inset: 0; z-index: 50; background: #05070c; font-family: var(--sans); cursor: pointer; animation: csin .5s ease; }
+.cs.out { opacity: 0; transition: opacity .5s ease; }
+@keyframes csin { from { opacity: 0; } }
+.cs canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.cs-bg { position: absolute; inset: 0; transition: background 1s ease; }
+.cs-bg.bg-future { background: radial-gradient(ellipse at 50% 40%, #173a5e 0%, #0a1629 55%, #04070d 100%); }
+.cs-bg.bg-future::after, .cs-bg.bg-alert::after { content: ''; position: absolute; left: -50%; right: -50%; bottom: 0; height: 42%;
+  background-image: linear-gradient(rgba(97, 214, 214, .25) 1px, transparent 1px), linear-gradient(90deg, rgba(97, 214, 214, .25) 1px, transparent 1px);
+  background-size: 60px 40px; transform: perspective(300px) rotateX(60deg); transform-origin: bottom; mask-image: linear-gradient(transparent, #000 70%); }
+.cs-bg.bg-alert { background: radial-gradient(ellipse at 50% 40%, #4a1020 0%, #1f0610 60%, #070205 100%); }
+.cs-bg.bg-alert::after { background-image: linear-gradient(rgba(255, 80, 110, .25) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 80, 110, .25) 1px, transparent 1px); }
+.cs-bg.bg-dark { background: radial-gradient(ellipse at 50% 45%, #1a1f33 0%, #07090f 70%); }
+.cs-bg.bg-dawn { background: radial-gradient(ellipse at 50% 30%, #ffd9a0 0%, #f39a7b 35%, #6b4d8a 75%, #2a2140 100%); }
+
+.cs-fx { position: absolute; inset: 0; pointer-events: none; }
+.cs-fx.fx-glitch { animation: glitch .7s steps(2) 1; }
+@keyframes glitch {
+  0% { background: rgba(255, 0, 80, .25); clip-path: inset(10% 0 70% 0); transform: translateX(-12px); }
+  25% { background: rgba(0, 255, 220, .2); clip-path: inset(55% 0 20% 0); transform: translateX(14px); }
+  50% { background: rgba(255, 0, 80, .3); clip-path: inset(30% 0 45% 0); transform: translateX(-8px); }
+  75% { background: rgba(0, 255, 220, .15); clip-path: inset(75% 0 5% 0); transform: translateX(10px); }
+  100% { background: transparent; clip-path: none; transform: none; }
+}
+.cs-fx.fx-pulse { animation: pulse .9s ease-out 1; }
+@keyframes pulse { 0% { box-shadow: inset 0 0 0 0 rgba(97, 214, 214, 0); } 40% { box-shadow: inset 0 0 160px 40px rgba(97, 214, 214, .45); } 100% { box-shadow: inset 0 0 0 0 rgba(97, 214, 214, 0); } }
+.cs-fx.fx-fail { animation: fail .8s ease-out 1; }
+@keyframes fail { 0%, 30% { background: rgba(231, 72, 86, .35); } 100% { background: transparent; } }
+.cs-fx.fx-white { animation: white 1.4s ease-out 1; }
+@keyframes white { 0% { background: rgba(255, 255, 255, 0); } 25% { background: rgba(255, 255, 255, .95); } 100% { background: rgba(255, 255, 255, 0); } }
+
+.cs-caption { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-size: clamp(22px, 4vw, 44px); font-weight: 700; color: #fff;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, .7); opacity: 0; transform: translateY(8px); transition: opacity .4s ease, transform .4s ease; padding: 0 24px; pointer-events: none; }
+.cs-caption.show { opacity: 1; transform: none; }
+.cs-sub { position: absolute; left: 50%; bottom: 7%; transform: translateX(-50%); width: min(820px, calc(100% - 32px)); background: rgba(8, 10, 16, .82);
+  border: 1px solid rgba(255, 255, 255, .12); border-radius: 8px; padding: 12px 18px 14px; color: #f0f0f0; font-size: clamp(15px, 1.6vw, 19px); line-height: 1.55; }
+.cs-sub b { display: block; font-size: 13px; margin-bottom: 2px; }
+.cs-sub.who-lam b { color: var(--amber); }
+.cs-sub.who-kru b { color: var(--pink); }
+.cs-sub.who-root b { color: var(--green); }
+.cs-sub.who-virus b { color: var(--violet); }
+.cs-sub.who-lung b { color: var(--teal); }
+.cs-skip { position: absolute; top: 16px; right: 16px; background: rgba(0, 0, 0, .45); border: 1px solid rgba(255, 255, 255, .2); color: #ddd; border-radius: 4px; padding: 6px 14px; font-size: 13px; }
+.cs-skip:hover { background: rgba(0, 0, 0, .7); }
+.cs-hint { position: absolute; left: 16px; bottom: 12px; font-size: 12px; color: rgba(255, 255, 255, .4); }
+
