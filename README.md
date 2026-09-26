@@ -8,7 +8,7 @@ A browser game that teaches Thai high-school students the Linux command line. Th
 | Phase | What you can type | Help from น้องล่าม (the interpreter penguin) |
 |---|---|---|
 | 1 | messy Thai (`ปิดคอมดิ`) | AI translates, shows the real command, runs it |
-| 2 | plain English (`list`, `copy`, `turnoff`) | maps it to the real command (runs it, later only suggests) |
+| 2 | ask in Thai, then type the real command yourself | teaches the command with every part explained, never runs it |
 | 3 | real command name + Thai for the rest (`ls ไฟล์ที่ซ่อนอยู่`) | translates only the arguments, shows what gets deleted before deleting |
 | 4 | exact syntax | none; an error decoder behind a button |
 | Bridge | pipes, `2>/dev/null`, `>`, `xargs` | none |
