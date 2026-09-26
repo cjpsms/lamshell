@@ -12,6 +12,7 @@ A browser game that teaches Thai high-school students the Linux command line. Th
 | 3 | real command name + Thai for the rest (`ls ไฟล์ที่ซ่อนอยู่`) | translates only the arguments, shows what gets deleted before deleting |
 | 4 | exact syntax | none; an error decoder behind a button |
 | Bridge | pipes, `2>/dev/null`, `>`, `xargs` | none |
+| Rescue + 5 | real tasks, `sudo`, `./script`, look before you delete | none |
 
 The selling point is **learning to read errors**: every error is the exact GNU coreutils/bash text, split into
 *who complains / about what / why* with a Thai explanation that fades out phase by phase.
@@ -43,6 +44,12 @@ sudo password in the game: `pass123`
 UI: a Windows Terminal lookalike for the shell; everything the game says (dialogue, hints, error decoder,
 yes/no questions, mission checklist) lives in the side panel so `clear` never wipes it.
 
+## Story
+
+Year 2050: น้องล่าม, the interpreter, lives in every computer until the virus มั่วซั่ว starts eating her language.
+She fades phase by phase, falls asleep after phase 3, gets rescued from `/quarantine` in a 4-level rescue arc,
+and wakes up at the end of phase 5. Three 3D cutscenes (`static/js/cutscene.js`) tell it.
+
 ## Not done yet
 
-Phase 5 + final boss, checkpoint quizzes, teacher dashboard.
+Phase 5 levels 5-1..5-6 (helping ครูสมใจ), checkpoint quizzes, user login / per-student logging, teacher dashboard.
