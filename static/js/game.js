@@ -23,6 +23,7 @@ const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(progres
 const lines = $('#lines');
 const input = $('#cmd');
 const term = $('#term');
+const feed = $('#feed');     // everything the game says lives here, so `clear` in the terminal never loses it
 let pending = null;      // { resolve, text, hidden } while a program asks for input
 let busy = false;
 const history = [];
@@ -51,16 +52,65 @@ function add(html, cls = '') {
   return d;
 }
 
+function note(html, cls = '') {
+  const d = document.createElement('div');
+  d.className = 'f ' + cls;
+  d.innerHTML = html;
+  feed.appendChild(d);
+  feed.scrollTop = feed.scrollHeight;
+  return d;
+}
+
+// Grey line in the terminal showing the command น้องล่าม actually ran for you.
+function ranLine(cmd, label = 'น้องล่ามแปล') {
+  add(`↳ ${esc(label)}: <b>${esc(cmd)}</b>`, 'cmt');
+}
+
 function write(kind, s) {
   const text = s.endsWith('\n') ? s.slice(0, -1) : s;
   add(ansi(text), kind === 'err' ? 'err' : 'out');
 }
 
-function say(who, text) {
-  const [name, icon] = WHO[who];
-  add(`<span class="av">${icon}</span><div class="bubble"><b>${name}</b>${esc(text)}</div>`, 'say who-' + who);
+// Character stage (3D models). Loaded on the side: if three.js or a model fails, the game still works.
+let stage = null;
+const earlyLines = [];   // lines said before the stage finished loading (the first level's intro)
+import('./stage.js').then(m => {
+  m.initStage($('#cast'));
+  stage = m;
+  earlyLines.splice(0).forEach(a => m.speak(...a));
+}).catch(e => console.warn('stage off:', e));
+
+function moodFor(who, text) {
+  if (who === 'virus') return 'happy';      // smug
+  if (/ดีมาก|เก่ง|เยี่ยม|ผ่าน|ได้แล้ว|สำเร็จ|ขอบใจ|ขอบคุณ|เจอแล้ว/.test(text)) return 'happy';
+  if (/หลง|ห้าม|ระวัง|พัง|ไม่ได้|ผิด|ช่วยด้วย|เต็ม|ด่วน/.test(text)) return 'surprised';
+  return 'neutral';
 }
-function sys(text, cls = '') { add(esc(text), 'sys ' + cls); }
+
+function say(who, text, extraHtml = '', now = false) {
+  const [name, icon] = WHO[who];
+  const el = note(`<div class="who">${icon} ${name}</div>${esc(text)}${extraHtml}`, 'say who-' + who);
+  const line = [who, name, text, moodFor(who, text), { now }];
+  if (stage) stage.speak(...line); else earlyLines.push(line);
+  return el;
+}
+
+// A yes/no question from a character: asked in the side panel (spoken on stage, with buttons);
+// the terminal only shows "(y/n)" so it can still be answered from the keyboard.
+async function ask(who, text, extraHtml = '') {
+  const el = say(who, text, extraHtml, true);
+  const btns = document.createElement('div');
+  btns.className = 'qbtns';
+  btns.innerHTML = '<button data-a="y">ใช่</button><button data-a="n">ไม่</button>';
+  el.appendChild(btns);
+  feed.scrollTop = feed.scrollHeight;
+  btns.onclick = e => { const a = e.target.dataset.a; if (a && pending) submit(a); };
+  const a = await io.prompt('(y/n) ');
+  const yes = !!a && /^y|ใช่/i.test(a.trim());
+  btns.querySelectorAll('button').forEach(b => { b.disabled = true; if (b.dataset.a === (yes ? 'y' : 'n')) b.classList.add('chosen'); });
+  return yes;
+}
+function sys(text, cls = '') { note(esc(text), 'sys ' + cls); }
 
 const io = {
   write,
@@ -72,14 +122,23 @@ const io = {
   }),
 };
 
+const HOST = 'student@ป้าเซิร์ฟ';
+const label = () => PHASES[L.lv.phase].prompt;
+// "$" hugs the path like bash; the phase prompts (ภาษาคน>, eng>, cmd>) get a space.
+const promptHTML = () => `<span class="pcwd"><span class="pu">${HOST}</span><span>:</span>${esc(L.sh.pretty())}</span>` +
+  `<span class="plabel">${label() === '$' ? '$' : ' ' + esc(label())}</span> `;
+
 function setPrompt() {
   if (pending) {
-    $('#pcwd').textContent = '';
+    $('#pcwd').innerHTML = '';
     $('#plabel').textContent = pending.text;
+    $('#plabel').style.marginLeft = '0';
     input.type = pending.hidden ? 'password' : 'text';
   } else {
-    $('#pcwd').textContent = L ? L.sh.pretty() : '';
-    $('#plabel').textContent = L ? PHASES[L.lv.phase].prompt : '$';
+    $('#pcwd').innerHTML = L ? `<span class="pu">${HOST}</span><span>:</span>${esc(L.sh.pretty())}` : '';
+    $('#plabel').textContent = L ? label() : '$';
+    $('#plabel').style.marginLeft = L && label() !== '$' ? '.6ch' : '0';
+    if (L) $('#tabtitle').textContent = `${HOST}: ${L.sh.pretty()}`;
     input.type = 'text';
   }
   input.placeholder = pending ? '' : L && L.lv.phase === 1 ? 'พิมพ์ภาษาไทยได้เลย…' : L && L.lv.phase === 2 ? 'ภาษาอังกฤษง่ายๆ…' : '';
@@ -109,7 +168,7 @@ async function submit(v) {
   }
   if (busy || !L) return;
   const text = v.trim();
-  add(`<span class="pcwd">${esc(L.sh.pretty())}</span> <span class="plabel">${esc(PHASES[L.lv.phase].prompt)}</span> ${esc(v)}`, 'echo');
+  add(promptHTML() + esc(v), 'echo');
   if (!text) return;
   history.push(text); histPos = history.length;
   busy = true;
@@ -150,15 +209,20 @@ async function loadLevel(idx, { replay = false } = {}) {
   lv.setup(fs);
   const sh = new Shell(fs, io, { cwd: lv.cwd, password: lv.password || 'pass123' });
   L = { idx, lv, fs, sh, hist: [], attempts: 0, aiUsed: 0, typedReal: false, hint: 0, decoderOpened: false, passed: false, shownPower: false };
+  // A question left open in the previous level (sudo password, y/n) must not swallow this level's first command.
+  // Drop it without resolving: resolving would let the old level's command carry on and print into this one.
+  if (pending) { pending = null; busy = false; input.classList.remove('busy'); }
   io.clear();
+  feed.innerHTML = '';
+  stage?.clearQueue();
+  earlyLines.length = 0;
   renderSide();
   setPrompt();
   const first = LEVELS.findIndex(x => x.phase === lv.phase) === idx;
-  add(`<span class="place">[${esc(lv.place)}]</span>   <span class="pcwd">${esc(sh.pretty())} ${esc(PHASES[lv.phase].prompt)}</span>`, 'head');
+  sys('📍 ' + lv.place);
   if (first && !replay) sys(`— เฟส ${lv.phase === 'B' ? 'สะพาน' : lv.phase}: ${PHASES[lv.phase].name} — ${PHASES[lv.phase].lam}`, 'phase');
   if (replay) sys('⏪ ย้อนเวลาแล้ว โลกกลับเป็นเหมือนตอนเริ่มด่าน', 'phase');
   else for (const [who, t] of lv.intro) { say(who, t); await sleep(250); }
-  sys('🎯 ภารกิจ: ' + lv.mission, 'mission');
   input.focus();
 }
 
@@ -189,11 +253,11 @@ async function handle(text) {
     const name = r.command.split(/\s+/)[0] === 'sudo' ? r.command.split(/\s+/).slice(0, 2).join(' ') : r.command.split(/\s+/)[0];
     const card = `<div class="card-map"><span>${esc(first)}</span> → <b>${esc(name)}</b></div>`;
     if (L.lv.mode === 'run') {
-      add(`<span class="tag">น้องล่ามช่วย</span> คุณหมายถึง <code>${esc(name)}</code> ใช่ไหม? เรารันให้ก่อนนะ ${card}`, 'trans');
+      note(`<span class="tag">น้องล่ามช่วย</span>คุณหมายถึง <code>${esc(name)}</code> ใช่ไหม? เรารันให้ก่อนนะ ${card}`, 'trans');
       showTranslation(r);
       return run(r.command, true);
     }
-    add(`<span class="tag">น้องล่ามช่วย</span> หมายถึง <code>${esc(name)}</code> ใช่ไหม? พิมพ์เองนะ ${card}`, 'trans');
+    note(`<span class="tag">น้องล่ามช่วย</span>หมายถึง <code>${esc(name)}</code> ใช่ไหม? พิมพ์เองนะ ${card}`, 'trans');
     return;
   }
 
@@ -224,7 +288,7 @@ function kedmaneeHint(text) {
 }
 
 async function think(text) {
-  const el = add('<span class="dots">น้องล่ามกำลังคิด</span>', 'thinking');
+  const el = note('<span class="dots">🐧 น้องล่ามกำลังคิด</span>', 'thinking');
   const r = await interpret(aiReq(text));
   el.remove();
   return r;
@@ -239,7 +303,8 @@ function showTranslation(r) {
   }
   const partsLine = (r.parts || []).filter(p => p.token && p.meaning && p.token !== r.command)
     .map(p => `<span class="pp"><mark>${esc(p.token)}</mark> = "${esc(p.meaning)}"</span>`).join('');
-  add(`<span class="tag">น้องล่ามแปล</span> <code class="cmdt">${cmd}</code>` +
+  ranLine(r.command);
+  note(`<span class="tag">น้องล่ามแปล</span><code class="cmdt">${cmd}</code>` +
       (partsLine && L.lv.phase === 3 ? `<div class="parts">${partsLine}</div>` : '') +
       (r.explain ? `<div class="explain">${esc(r.explain)}</div>` : ''), 'trans');
 }
@@ -252,8 +317,7 @@ async function translateAndRun(text) {
   showTranslation(r);
   if (/(^|[\s|;&])(rm|find\b.*-delete)\b|-delete\b/.test(r.command) && !(await previewDelete(r.command))) return;
   else if (r.confidence < 0.6) {
-    const a = await io.prompt(`หมายถึง ${r.command} ใช่ไหม? (y/n) `);
-    if (!a || !/^y|ใช่/i.test(a.trim())) { say('lam', 'โอเค งั้นลองบอกใหม่อีกแบบนะ'); return; }
+    if (!(await ask('lam', `หมายถึง ${r.command} ใช่ไหม?`))) { say('lam', 'โอเค งั้นลองบอกใหม่อีกแบบนะ'); return; }
   }
   await run(r.command, true);
 }
@@ -269,9 +333,8 @@ async function previewDelete(cmd) {
   const top = gone.filter(p => !gone.some(q => q !== p && q.endsWith('/') && p.startsWith(q)));
   if (!top.length) return true;
   const rel = p => L.sh.pretty(p.replace(/\/$/, '')).replace(L.sh.pretty() + '/', '') + (p.endsWith('/') ? '/' : '');
-  add(`<div class="preview"><b>ดูก่อนลบ:</b> จะลบ ${top.length} รายการนี้<ul>${top.map(p => `<li>${esc(rel(p))}</li>`).join('')}</ul></div>`, 'trans');
-  const a = await io.prompt('ยืนยันไหม? (y/n) ');
-  if (a && /^y|ใช่/i.test(a.trim())) return true;
+  const list = `<ul class="gone">${top.map(p => `<li>${esc(rel(p))}</li>`).join('')}</ul>`;
+  if (await ask('lam', `ดูก่อนลบ: คำสั่งนี้จะลบ ${top.length} รายการนี้ ยืนยันไหม?`, list)) return true;
   say('lam', 'ยกเลิกแล้ว ไม่มีอะไรถูกลบ ดีมากที่อ่านก่อน!');
   return false;
 }
@@ -280,7 +343,7 @@ async function previewDelete(cmd) {
 async function runAndHelp(text) {
   const res = await run(text);
   if (!res || res.code === 0 || L.passed || !res.stderr) return res;
-  const el = add('<span class="dots">น้องล่ามกำลังดูว่าผิดตรงไหน</span>', 'thinking');
+  const el = note('<span class="dots">🐧 น้องล่ามกำลังดูว่าผิดตรงไหน</span>', 'thinking');
   const r = await interpret({ ...aiReq(text), mode: 'fix', error: res.stderr });
   el.remove();
   if (r.offline) return res;
@@ -291,29 +354,32 @@ async function runAndHelp(text) {
     if (msg) say('lam', msg);
     return res;
   }
-  add(`<span class="tag">น้องล่ามช่วยแก้</span> <code class="cmdt">${esc(r.command)}</code>` +
+  note(`<span class="tag">น้องล่ามช่วยแก้</span><code class="cmdt">${esc(r.command)}</code>` +
       (r.explain ? `<div class="explain">${esc(r.explain)}</div>` : ''), 'trans');
   if (phase === 2 && L.lv.mode === 'suggest') { say('lam', 'ลองแก้แล้วพิมพ์เองนะ'); return res; }
-  const a = await io.prompt('ให้เรารันแบบที่แก้แล้วไหม? (y/n) ');
-  if (!a || !/^y|ใช่/i.test(a.trim())) { say('lam', 'โอเค ลองแก้เองนะ สู้ๆ!'); return res; }
+  if (!(await ask('lam', 'ให้เรารันแบบที่แก้แล้วไหม?'))) { say('lam', 'โอเค ลองแก้เองนะ สู้ๆ!'); return res; }
   L.aiUsed++;
   L.typedReal = false;
   L.lastTranslated = r.command;
   if (/(^|[\s|;&])rm\b|-delete\b/.test(r.command) && !(await previewDelete(r.command))) return res;
+  ranLine(r.command, 'น้องล่ามแก้');
   return run(r.command, true);
 }
 
 async function run(line, translated = false) {
+  const before = new Set(L.fs.allPaths());
   const res = await L.sh.exec(line);
+  res.created = L.fs.allPaths().filter(p => !before.has(p));
   res.translated = translated;
   L.hist.push(res);
   L.attempts++;
   const phase = L.lv.phase;
-  if (phase === 4 || phase === 'B') add(`[${res.code}]`, res.code === 0 ? 'code ok' : 'code bad');
+  if (phase === 4 || phase === 'B') add(`[exit ${res.code}]`, 'code');
   renderDecoder(res.stderr);
   if (L.sh.flags.wiped) return wipedScene();
   if (L.sh.flags.poweroff && !L.shownPower) { L.shownPower = true; await powerScene(); }
   checkLevel();
+  renderSteps();
   return res;
 }
 
@@ -338,14 +404,14 @@ function renderDecoder(stderr) {
   };
   const html = items.slice(0, 3).map(box).join('');
   if (phase === 4 || phase === 'B') {
-    const el = add(`<button class="book">📖 เปิดสมุดน้องล่าม</button>`, 'decwrap');
+    const el = note(`<button class="book">📖 เปิดสมุดน้องล่าม</button>`, 'decwrap');
     el.querySelector('button').onclick = () => {
       L.decoderOpened = true;
       el.innerHTML = html;
-      scroll();
+      feed.scrollTop = feed.scrollHeight;
       renderSide();
     };
-  } else add(html, 'decwrap');
+  } else note(html, 'decwrap');
 }
 
 async function powerScene() {
@@ -377,18 +443,51 @@ function checkLevel() {
   if (L.lv.check(g)) return pass();
   // The command worked but the mission isn't done: say so, because a silent success looks like nothing happened.
   const r = g.res;
+  if (r && r.code !== 0 && L.lv.errNudge) {
+    const n = L.lv.errNudge(g);
+    if (n && n !== L.lastNudge) { L.lastNudge = n; say([1, 2, 3].includes(L.lv.phase) ? 'lam' : 'root', n); }
+  }
   if (!r || r.code !== 0) return;
   const early = [1, 2, 3].includes(L.lv.phase);
   if (early && !L.silentShown && !r.stdout && !r.stderr) {
     L.silentShown = true;
     sys('✓ ไม่มีข้อความตอบกลับ = ทำสำเร็จแล้ว (Linux จะเงียบเมื่อทำเสร็จ และจะบ่นเฉพาะตอนมีปัญหา)', 'win');
   }
+  if (typoHint(r)) return;
   if (lostHint(r)) return;
   const n = L.lv.nudge && L.lv.nudge(g);
   if (n && n !== L.lastNudge) {
     L.lastNudge = n;
     say(early ? 'lam' : 'root', n);
   }
+}
+
+// Levenshtein distance, small strings only.
+function editDist(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+
+// Created something whose name is *almost* a name from the mission (scores.cvs vs scores.csv)?
+// The command succeeded silently, so without this the player just sees "not passed" and no reason.
+function typoHint(r) {
+  const wanted = [...new Set(L.lv.mission.match(/[A-Za-z0-9_][A-Za-z0-9_.\-]{2,}/g) || [])];
+  for (const p of r.created || []) {
+    const name = p.replace(/\/$/, '').split('/').pop();
+    if (wanted.includes(name)) continue;
+    const near = wanted.find(w => editDist(name.toLowerCase(), w.toLowerCase()) <= (w.length < 5 ? 1 : 2));
+    if (!near || L.typoSaid?.has(name)) continue;
+    (L.typoSaid ||= new Set()).add(name);
+    const where = L.sh.pretty(p.replace(/\/$/, ''));
+    if (L.lv.phase === 4 || L.lv.phase === 'B') say('root', `เพิ่งสร้าง ${where} แต่ภารกิจบอก ${near} อ่านชื่อทีละตัวดีๆ`);
+    else say('lam', `เอ๊ะ เพิ่งสร้าง ${where} ขึ้นมา แต่ภารกิจบอกว่า ${near} นะ ชื่อต่างกันนิดเดียว เครื่องถือว่าเป็นคนละไฟล์เลย ลองดูชื่อด้วย ls แล้วแก้ด้วย mv`);
+    return true;
+  }
+  return false;
 }
 
 // Relative path from one absolute dir to another, e.g. /a/b/c -> /a/x  =>  ../../x
@@ -443,7 +542,7 @@ async function pass() {
   save();
   for (const [who, t] of L.lv.outro || []) { await sleep(200); say(who, t); }
   const cards = (L.lv.cards || []).map(c => `<span class="cardchip">${esc(c)}</span>`).join(' ');
-  const el = add(`<div class="passbox"><div class="pt">✅ ผ่านด่าน ${esc(id)}</div>` +
+  const el = note(`<div class="passbox"><div class="pt">✅ ผ่านด่าน ${esc(id)}</div>` +
     (cards ? `<div>ได้การ์ดคำสั่ง ${cards}</div>` : '') +
     `<div class="stars">${starStr(L.stars)}</div>` +
     `<div class="why">${esc(starWhy())}</div>` +
@@ -452,7 +551,7 @@ async function pass() {
   el.querySelector('.again').addEventListener('click', () => loadLevel(L.idx, { replay: true }));
   if (L.lv.phase === 1 && L.stars < 3 && L.lastTranslated && L.hint < 3) {
     L.challenge = true;
-    sys(`⭐ ท้าพิมพ์เอง: พิมพ์คำสั่งจริง (สีเทาข้างบน) ด้วยมือตัวเองเพื่อรับดาวที่ 3`, 'mission');
+    sys(`⭐ ท้าพิมพ์เอง: พิมพ์คำสั่งจริง (บรรทัดสีเทา ↳ ในเทอร์มินัล) ด้วยมือตัวเองเพื่อรับดาวที่ 3`, 'mission');
   }
   renderSide();
 }
@@ -496,6 +595,15 @@ function useHint() {
 
 // ---------- side panel ----------
 
+// Multi-part missions show a checklist, so the player can see what's done and what's left.
+function renderSteps() {
+  const el = $('#steps');
+  if (!L.lv.steps) { el.innerHTML = ''; return; }
+  const g = { fs: L.fs, sh: L.sh, res: L.hist[L.hist.length - 1], hist: L.hist };
+  el.innerHTML = L.lv.steps.map(([t, done]) =>
+    `<li class="${done(g) ? 'ok' : ''}">${esc(typeof t === 'function' ? t(g) : t)}</li>`).join('');
+}
+
 function renderSide() {
   if (!L) return;
   const lv = L.lv;
@@ -503,6 +611,7 @@ function renderSide() {
   $('#lvtitle').textContent = lv.title;
   $('#lvphase').textContent = lv.phase === 'B' ? 'ด่านสะพาน · ' + PHASES.B.name : `เฟส ${lv.phase} · ${PHASES[lv.phase].name}`;
   $('#mission').textContent = lv.mission;
+  renderSteps();
   const best = progress.stars[lv.id] || 0;
   $('#lvstars').textContent = L.passed ? starStr(L.stars) : best ? `สถิติ ${starStr(best)}` : '☆☆☆';
   const hb = $('#hint');

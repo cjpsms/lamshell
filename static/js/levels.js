@@ -8,6 +8,13 @@ const S = HOME + '/school';
 const ranOk = (g, name, pred = () => true) => g.hist.some(r => r.cmds.some(c => c.name === name && c.code === 0 && pred(c)));
 const sawOut = (g, s) => g.hist.some(r => r.stdout.includes(s));
 const sawErr = (g, s) => g.hist.some(r => r.stderr.includes(s));
+// B3: found the flag, nothing else on screen (`find / 2>/dev/null` alone lists every file -- doesn't count).
+const onlyFlag = r => !!r && r.stdout.includes('/var/backups/.old/flag.txt') &&
+  r.stdout.trim().split('\n').every(l => l.includes('flag.txt'));
+const cleanFlag = r => onlyFlag(r) && r.stderr === '';
+// B4: the list has all 3 big downloads and neither small one.
+const BIG = ['movie_night.mp4', 'ubuntu.iso', 'old_backup.zip'], SMALL = ['song.mp3', 'homework.pdf'];
+const bigOnly = t => !!t && BIG.every(f => t.includes(f)) && !SMALL.some(f => t.includes(f));
 const lastOut = g => (g.res ? g.res.stdout.replace(/\x1b\[[0-9;]*m/g, '').trim() : '');
 
 // ---- shared worlds ----
@@ -56,6 +63,7 @@ export const LEVELS = [
       ['lam', 'บอกเรามาเป็นภาษาไทยเลยว่าอยากทำอะไร เช่น อยากรู้ว่าในห้องนี้มีอะไรบ้าง'],
     ],
     mission: 'สำรวจว่าไวรัสทิ้งอะไรไว้ในห้องนี้บ้าง',
+    steps: [['ดูว่าในห้องมีอะไรบ้าง', g => ranOk(g, 'ls')]],
     hint1: ['ls'], solution: 'ls', cards: ['ls'],
     check: g => ranOk(g, 'ls'),
     outro: [['lam', 'เห็นไหม! คำสั่งจริงคือ ls (ย่อมาจาก list) คนใช้ Linux จริงพิมพ์แค่ 2 ตัวนี้เอง ...เอ๊ะ virus.exe คืออะไรน่ะ?!']],
@@ -65,6 +73,7 @@ export const LEVELS = [
     setup: fs => school(fs), aliases: P1_ALIASES,
     intro: [['kru', 'ฮัลโหล~ ครูสมใจเองจ้า มาหาครูที่ห้องพักครูหน่อย มีเรื่องด่วน!']],
     mission: 'เข้าไปในห้องพักครู (teachers_room)',
+    steps: [['ดูก่อนว่าห้องพักครูอยู่ตรงไหน', g => ranOk(g, 'ls') || g.sh.cwd === S + '/teachers_room'], ['เข้าไปในห้องพักครู', g => g.sh.cwd === S + '/teachers_room']],
     hint1: ['cd'], solution: 'cd teachers_room', cards: ['cd'],
     check: g => g.sh.cwd === S + '/teachers_room',
     outro: [['lam', 'cd ย่อมาจาก change directory = ย้ายไปอยู่ในโฟลเดอร์อื่น สังเกตไหมว่า prompt เปลี่ยนเป็น ~/school/teachers_room แล้ว']],
@@ -74,6 +83,7 @@ export const LEVELS = [
     setup: fs => school(fs), aliases: P1_ALIASES,
     intro: [['lam', 'ครูไม่อยู่แฮะ แต่มีจดหมายวางไว้บนโต๊ะ ลองให้เราอ่านให้ฟังสิ']],
     mission: 'อ่านจดหมายที่ครูทิ้งไว้',
+    steps: [['ดูว่ามีจดหมายอะไรบ้าง', g => ranOk(g, 'ls') || sawOut(g, 'ช่วยด้วย')], ['อ่านจดหมาย', g => sawOut(g, 'ช่วยด้วย')]],
     hint1: ['cat'], solution: 'cat letter.txt', cards: ['cat'],
     check: g => sawOut(g, 'ช่วยด้วย'),
     outro: [['lam', 'cat = แสดงเนื้อหาไฟล์ออกมาบนจอ (มาจาก concatenate แต่จำง่ายๆ ว่าแมวอ่านจดหมายให้ฟัง 🐱)'], ['kru', 'ไฟล์เกรดหายจริงๆ นะ! แต่ก่อนอื่นเก็บไฟล์สำคัญให้ปลอดภัยก่อน']],
@@ -85,6 +95,7 @@ export const LEVELS = [
     mission: 'สร้างโฟลเดอร์ชื่อ backup แล้วลองสั่งสร้างซ้ำอีกรอบ ดูว่าเครื่องบ่นว่าอะไร',
     hint1: ['mkdir'], solution: 'mkdir backup  (แล้วสั่งซ้ำอีกที)', cards: ['mkdir'],
     check: g => g.fs.isDir(S + '/backup') && sawErr(g, 'File exists'),
+    steps: [['สร้างโฟลเดอร์ backup', g => g.fs.isDir(S + '/backup')], ['สั่งสร้างซ้ำ แล้วดูว่าเครื่องบ่นอะไร', g => sawErr(g, 'File exists')]],
     nudge: g => g.fs.isDir(S + '/backup') && 'สร้างได้แล้ว! ทีนี้ลองสั่งสร้าง backup ซ้ำอีกรอบดูสิ เครื่องจะบ่นว่าอะไร',
     outro: [['lam', 'mkdir = make directory แล้ว error เมื่อกี้อ่านแบบนี้: mkdir (ใครบ่น) : backup (เรื่องอะไร) : File exists (เพราะมีอยู่แล้ว) ง่ายนิดเดียว!']],
   },
@@ -93,6 +104,7 @@ export const LEVELS = [
     setup: fs => { school(fs); fs.mkdirp(S + '/backup'); }, aliases: P1_ALIASES,
     intro: [['lam', 'การบ้านของทั้งห้องอยู่ใน homework.txt ก๊อปเก็บไว้ในที่หลบภัยก่อนไวรัสมาแก้!']],
     mission: 'ก๊อปการบ้าน (homework.txt) ไปไว้ในโฟลเดอร์ backup โดยต้นฉบับยังอยู่',
+    steps: [['ก๊อป homework.txt ไปไว้ใน backup', g => g.fs.isFile(S + '/backup/homework.txt')], ['ต้นฉบับยังอยู่ที่เดิม', g => g.fs.isFile(S + '/backup/homework.txt') && g.fs.isFile(S + '/homework.txt')]],
     hint1: ['cp'], solution: 'cp homework.txt backup/', cards: ['cp'],
     check: g => g.fs.isFile(S + '/backup/homework.txt') && g.fs.isFile(S + '/homework.txt'),
     fail: g => !g.fs.isFile(S + '/homework.txt') && 'การบ้านต้นฉบับหายไปจากที่เดิม! ภารกิจให้ก๊อป (ต้นฉบับต้องอยู่) ไม่ใช่ย้าย กด "ย้อนเวลา" แล้วลองใหม่',
@@ -103,6 +115,7 @@ export const LEVELS = [
     setup: fs => school(fs), aliases: P1_ALIASES,
     intro: [['virus', 'หึหึ... รูปรุ่นนี่ดูน่าอร่อยจัง 👾'], ['lam', 'ไม่นะ! ย้ายรูปรุ่นไปไว้ในอัลบั้ม photos ด่วน!']],
     mission: 'ย้ายรูปรุ่น (class_photo.jpg) ไปไว้ในโฟลเดอร์ photos',
+    steps: [['รูปไปอยู่ใน photos แล้ว', g => g.fs.isFile(S + '/photos/class_photo.jpg')], ['ที่เดิมไม่เหลือรูปแล้ว (ย้าย ไม่ใช่ก๊อป)', g => g.fs.isFile(S + '/photos/class_photo.jpg') && !g.fs.exists(S + '/class_photo.jpg')]],
     hint1: ['mv'], solution: 'mv class_photo.jpg photos/', cards: ['mv'],
     check: g => g.fs.isFile(S + '/photos/class_photo.jpg') && !g.fs.exists(S + '/class_photo.jpg'),
     nudge: g => g.fs.isFile(S + '/photos/class_photo.jpg') && g.fs.exists(S + '/class_photo.jpg') && 'ก๊อปไปไว้ใน photos แล้ว แต่รูปต้นฉบับยังวางอยู่ที่เดิมให้ไวรัสกิน! ก๊อป = ของเดิมยังอยู่ ภารกิจนี้ต้อง "ย้าย"',
@@ -113,6 +126,7 @@ export const LEVELS = [
     setup: fs => school(fs), aliases: P1_ALIASES,
     intro: [['kru', 'ไฟล์เกรดของครูชื่อมีคำว่า grade อยู่ แต่ไวรัสซ่อนไว้ลึกมาก หาให้ครูหน่อยนะ']],
     mission: 'หาไฟล์เกรดของครู (ชื่อมีคำว่า grade) ว่าซ่อนอยู่ตรงไหน',
+    steps: [['ค้นหาไฟล์ที่ชื่อมี grade', g => sawOut(g, 'grades.txt')], ['รู้ว่าไฟล์ซ่อนอยู่ในโฟลเดอร์ไหน (เห็นที่อยู่เต็มๆ)', g => sawOut(g, 'old/2569/term1/grades.txt')]],
     hint1: ['find', '-name'], solution: 'find . -name "*grade*"', cards: ['find'],
     check: g => sawOut(g, 'old/2569/term1/grades.txt'),
     outro: [['kru', 'เจอแล้ว! อยู่ที่ old/2569/term1/grades.txt นี่เอง ขอบใจมากจ้า'], ['lam', 'find = ค้นหา *grade* แปลว่า "อะไรก็ได้ที่มีคำว่า grade อยู่ตรงกลาง"']],
@@ -125,6 +139,7 @@ export const LEVELS = [
       ['root', 'หวัดดี พี่รูทเอง ม.6 ผู้ดูแลระบบ ไฟล์นั้นล็อกไว้ อ่านได้แค่แอดมิน ถ้าโดนปฏิเสธก็ขอใช้สิทธิ์แอดมินนะ รหัสผ่านคือ pass123'],
     ],
     mission: 'อ่านไฟล์ข้อสอบ exam.txt (ถ้าไม่มีสิทธิ์ ให้ขอใช้สิทธิ์แอดมิน รหัส pass123)',
+    steps: [['ลองอ่าน exam.txt', g => sawErr(g, 'Permission denied') || sawOut(g, 'ข้อสอบกลางภาค')], ['ใช้สิทธิ์แอดมินอ่านให้ได้', g => sawOut(g, 'ข้อสอบกลางภาค')]],
     hint1: ['cat', 'sudo'], solution: 'sudo cat exam.txt   (รหัส pass123)', cards: ['sudo'],
     check: g => sawOut(g, 'ข้อสอบกลางภาค'),
     outro: [['root', 'sudo = "ทำในนามแอดมิน" ตอนพิมพ์รหัสจะไม่มีอะไรขึ้นจอ เป็นเรื่องปกติ พลังมากต้องรับผิดชอบมากนะน้อง']],
@@ -139,6 +154,7 @@ export const LEVELS = [
     mission: 'ลบ virus.exe แล้วปิดเครื่อง',
     hint1: ['rm', 'sudo', 'poweroff'], solution: 'rm virus.exe  แล้ว  sudo poweroff', cards: ['rm', 'poweroff'],
     check: g => !g.fs.exists(S + '/virus.exe') && g.sh.flags.poweroff,
+    steps: [['ลบ virus.exe', g => !g.fs.exists(S + '/virus.exe')], ['ปิดเครื่อง', g => g.sh.flags.poweroff]],
     outro: [['lam', 'รอดแล้ว!! rm = remove (ลบแล้วหายเลย ไม่มีถังขยะ) poweroff = ปิดเครื่อง ครบ 10 คำสั่งแล้ว เก่งมาก!'], ['virus', '...ข้าจะกลับมา และคราวหน้าข้าจะกัดล่ามของเจ้า 👾']],
   },
 
@@ -151,6 +167,7 @@ export const LEVELS = [
       ['lam', 'บรรณารักษ์อยากรู้ว่ามีอะไรในห้องสมุดบ้าง ลองสั่งเป็นภาษาอังกฤษดูสิ'],
     ],
     mission: 'ดูว่าในห้องสมุดมีอะไรบ้าง (พิมพ์เป็นภาษาอังกฤษ)',
+    steps: [['ดูว่าในห้องสมุดมีอะไรบ้าง', g => ranOk(g, 'ls')]],
     hint1: ['ls'], solution: 'ls', cards: [],
     check: g => ranOk(g, 'ls'),
     outro: [['lam', 'จำไว้นะ list → ls คนเขาย่อให้สั้น']],
@@ -160,6 +177,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'lab/': { 'notes/': {} }, 'library/': {}, 'gym/': {} }),
     intro: [['lam', 'ต่อไปไปห้องแล็บ (lab) กัน ลองสั่งให้พาไปดูสิ']],
     mission: 'ไปที่ห้องแล็บ (lab)',
+    steps: [['ดูว่ามีห้องอะไรบ้าง', g => ranOk(g, 'ls') || g.sh.cwd === S + '/lab'], ['เข้าไปในห้อง lab', g => g.sh.cwd === S + '/lab']],
     hint1: ['cd'], solution: 'cd lab', cards: [],
     check: g => g.sh.cwd === S + '/lab',
     outro: [['lam', 'goto → cd  ถ้าหลงเข้าห้องผิด cd .. ถอยออกมาได้เสมอ ดู prompt ข้างหน้าว่าตอนนี้อยู่ไหน']],
@@ -169,6 +187,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S + '/lab', { 'notes/': { 'day1.txt': 'บันทึกวันที่ 1: ผลการทดลองถูกไวรัสแก้เป็น 999 ทุกช่อง!' }, 'beaker.txt': 'บีกเกอร์ 20 ใบ' }),
     intro: [['lam', 'บันทึกการทดลองอยู่ใน notes ลองสั่งอ่าน notes ดูก่อน']],
     mission: 'อ่านบันทึกการทดลองวันแรก (อยู่ใน notes)',
+    steps: [['ดูว่าใน notes มีอะไร', g => sawOut(g, 'day1.txt') || sawOut(g, 'บันทึกวันที่ 1')], ['อ่านบันทึกวันแรก', g => sawOut(g, 'บันทึกวันที่ 1')]],
     hint1: ['cat'], solution: 'cat notes/day1.txt', cards: [],
     check: g => sawOut(g, 'บันทึกวันที่ 1'),
     outro: [['lam', 'notes เป็นโฟลเดอร์ cat เลยบ่นว่า Is a directory ต้องบอกไฟล์ข้างในแบบ notes/day1.txt']],
@@ -178,6 +197,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'club/': { 'members.txt': 'สมาชิก 8 คน' } }),
     intro: [['lam', 'ชมรมหุ่นยนต์อยากได้โฟลเดอร์ใหม่ ลองสร้างชื่อ club ดูก่อนนะ แล้วค่อยสร้างชื่อ robot_club']],
     mission: 'สร้างโฟลเดอร์ใหม่ชื่อ robot_club',
+    steps: [['สร้างโฟลเดอร์ robot_club', g => g.fs.isDir(S + '/robot_club')]],
     hint1: ['mkdir'], solution: 'mkdir robot_club', cards: [],
     check: g => g.fs.isDir(S + '/robot_club'),
     outro: [['lam', 'newfolder → mkdir ต่อจากนี้เราจะแค่บอกว่าหมายถึงคำสั่งไหน แต่จะไม่รันให้แล้วนะ ต้องพิมพ์เอง!']],
@@ -187,6 +207,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'club/': { 'members.txt': 'สมาชิก 8 คน', 'plan.txt': 'แผนสร้างหุ่นยนต์เก็บขยะ' } }),
     intro: [['lam', '(เสียงแหบลง) ต่อจากนี้เราบอกได้แค่ว่าหมายถึงคำสั่งอะไร ต้องพิมพ์เองนะ'], ['lam', 'ก๊อปทั้งโฟลเดอร์ club เป็น club_bak เผื่อไวรัสมาลบ']],
     mission: 'ก๊อปโฟลเดอร์ club ทั้งโฟลเดอร์ไปเป็น club_bak',
+    steps: [['มีโฟลเดอร์ club_bak แล้ว', g => g.fs.isDir(S + '/club_bak')], ['ข้างในมีของครบทุกไฟล์', g => g.fs.isFile(S + '/club_bak/members.txt') && g.fs.isFile(S + '/club_bak/plan.txt')]],
     hint1: ['cp', '-r'], solution: 'cp -r club club_bak', cards: [],
     check: g => g.fs.isFile(S + '/club_bak/members.txt') && g.fs.isFile(S + '/club_bak/plan.txt'),
     outro: [['lam', 'ก๊อปโฟลเดอร์ต้องใส่ -r (recursive = ลงไปทุกชั้น) ไม่งั้น cp จะบอกว่า omitting directory']],
@@ -196,6 +217,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'rpeort.txt': 'รายงานชมรมหุ่นยนต์ ภาคเรียนที่ 1', 'club/': {} }),
     intro: [['virus', 'ข้าสลับตัวอักษรชื่อไฟล์รายงานเล่นๆ อ่านออกไหมล่ะ 👾'], ['lam', 'rpeort.txt ต้องเป็น report.txt!']],
     mission: 'เปลี่ยนชื่อ rpeort.txt เป็น report.txt',
+    steps: [['มี report.txt แล้ว', g => g.fs.isFile(S + '/report.txt')], ['rpeort.txt ชื่อผิดไม่เหลือแล้ว', g => g.fs.isFile(S + '/report.txt') && !g.fs.exists(S + '/rpeort.txt')]],
     hint1: ['mv'], solution: 'mv rpeort.txt report.txt', cards: [],
     check: g => g.fs.isFile(S + '/report.txt') && !g.fs.exists(S + '/rpeort.txt'),
     nudge: g => g.fs.isFile(S + '/report.txt') && g.fs.exists(S + '/rpeort.txt') && 'มี report.txt แล้ว แต่ rpeort.txt ชื่อผิดก็ยังอยู่ ภารกิจคือเปลี่ยนชื่อ ไม่ใช่ก๊อปเพิ่ม',
@@ -206,6 +228,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'nest/': { 'egg1.mua': '👾', 'egg2.mua': '👾', 'egg3.mua': '👾' }, 'report.txt': 'รายงาน', 'club/': {} }),
     intro: [['lam', 'ไวรัสวางไข่ไว้ในโฟลเดอร์ nest! ลบทิ้งทั้งรังเลย แต่ของอื่นห้ามหายนะ']],
     mission: 'ลบโฟลเดอร์ nest ทั้งโฟลเดอร์ โดยของอื่นยังอยู่ครบ',
+    steps: [['ลบโฟลเดอร์ nest ทั้งโฟลเดอร์', g => !g.fs.exists(S + '/nest')], ['ของอื่นยังอยู่ครบ', g => !g.fs.exists(S + '/nest') && g.fs.isFile(S + '/report.txt') && g.fs.isDir(S + '/club')]],
     hint1: ['rm', '-r'], solution: 'rm -r nest', cards: [],
     check: g => !g.fs.exists(S + '/nest') && g.fs.isFile(S + '/report.txt') && g.fs.isDir(S + '/club'),
     fail: g => (!g.fs.isFile(S + '/report.txt') || !g.fs.isDir(S + '/club')) && 'ของที่ไม่ใช่ไวรัสหายไปด้วย! กด "ย้อนเวลา" แล้วลองใหม่',
@@ -218,6 +241,7 @@ export const LEVELS = [
     mission: 'ค้นหาไฟล์ที่ชื่อมีคำว่า mua ให้เจอ แล้วปิดเครื่อง',
     hint1: ['find', 'sudo', 'poweroff'], solution: 'find . -name "*mua*"  แล้ว  sudo poweroff', cards: [],
     check: g => sawOut(g, 'mua_king.bin') && g.sh.flags.poweroff,
+    steps: [['หาไฟล์ที่ชื่อมีคำว่า mua', g => sawOut(g, 'mua_king.bin')], ['ปิดเครื่อง', g => g.sh.flags.poweroff]],
     outro: [['lam', 'turnoff ไม่มีใน Linux จริง เราเลยช่วยเดาให้ Ubuntu ก็ใช้กลไก command_not_found_handle แบบนี้แหละ'], ['virus', 'หนอย... คราวนี้ข้ากัดเสียงล่ามแน่ 👾']],
   },
 
@@ -227,6 +251,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S + '/stage', { '.virus_nest/': { 'egg.mua': '👾' }, 'costumes/': {}, 'props.txt': 'อุปกรณ์ละคร' }),
     intro: [['lam', '(เสียงแหบ) เราแปลได้แค่ "ไส้ใน" แล้วนะ ชื่อคำสั่งต้องพิมพ์เองเท่านั้น'], ['lam', 'ไวรัสซ่อนรังไว้ในห้องนี้ ลองดูไฟล์ที่ซ่อนอยู่สิ']],
     mission: 'ดูรายชื่อไฟล์ รวมไฟล์ที่ซ่อนอยู่ด้วย',
+    steps: [['ดูไฟล์ในห้อง', g => ranOk(g, 'ls')], ['เห็นไฟล์ที่ซ่อนอยู่ด้วย', g => sawOut(g, '.virus_nest')]],
     hint1: ['ls', '-a'], solution: 'ls -a', cards: ['ls -a'],
     check: g => sawOut(g, '.virus_nest'),
     outro: [['lam', 'ไฟล์ที่ชื่อขึ้นต้นด้วยจุดคือไฟล์ซ่อน! -a = all']],
@@ -236,6 +261,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S + '/stage/costumes/hats/red', { 'hat.txt': 'หมวกแดง' }),
     intro: [['lam', 'หลงเข้ามาลึกเกิน! ลองถอยออกไปทีละชั้น หรือกลับบ้านทีเดียวเลยก็ได้']],
     mission: 'กลับบ้าน (~)',
+    steps: [['กลับบ้าน (~)', g => g.sh.cwd === HOME]],
     hint1: ['cd ..', 'cd ~'], solution: 'cd ~', cards: ['cd ..'],
     check: g => g.sh.cwd === HOME,
     outro: [['lam', 'cd .. = ถอยหนึ่งชั้น, cd ~ หรือ cd เฉยๆ = กลับบ้าน']],
@@ -245,6 +271,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'projects/': {} }),
     intro: [['kru', 'ครูอยากได้โฟลเดอร์ projects/2569/science ไว้เก็บโครงงาน']],
     mission: 'สร้างโฟลเดอร์ projects/2569/science (ซ้อนหลายชั้น)',
+    steps: [['มี projects', g => g.fs.isDir(S + '/projects')], ['มี projects/2569', g => g.fs.isDir(S + '/projects/2569')], ['มี projects/2569/science', g => g.fs.isDir(S + '/projects/2569/science')]],
     hint1: ['mkdir', '-p'], solution: 'mkdir -p projects/2569/science', cards: ['mkdir -p'],
     check: g => g.fs.isDir(S + '/projects/2569/science'),
     outro: [['lam', '-p = parents สร้างชั้นที่ขาดให้ครบในทีเดียว']],
@@ -254,6 +281,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'club/': { 'members.txt': 'สมาชิก', 'robots/': { 'arm.txt': 'แขนกล' } }, 'backup/': {} }),
     intro: [['lam', 'สำรองงานชมรมทั้งโฟลเดอร์เข้า backup กัน']],
     mission: 'ก๊อปโฟลเดอร์ club ทั้งโฟลเดอร์ไปไว้ใน backup',
+    steps: [['มี club อยู่ใน backup แล้ว', g => g.fs.isDir(S + '/backup/club')], ['ข้างในครบทุกชั้น', g => g.fs.isFile(S + '/backup/club/robots/arm.txt')]],
     hint1: ['cp', '-r'], solution: 'cp -r club backup/', cards: ['cp -r'],
     check: g => g.fs.isFile(S + '/backup/club/robots/arm.txt'),
     outro: [['lam', 'ทั้งโฟลเดอร์ = -r จำไว้ใช้ได้ทั้ง cp และ rm']],
@@ -263,6 +291,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'report.exe': 'รายงานผลการเรียน (จริงๆ เป็นข้อความธรรมดา)' }),
     intro: [['virus', 'ข้าเปลี่ยนนามสกุลรายงานเป็น .exe ให้ดูน่ากลัวเล่น 👾']],
     mission: 'เปลี่ยนชื่อ report.exe เป็น report.txt',
+    steps: [['มี report.txt แล้ว', g => g.fs.isFile(S + '/report.txt')], ['report.exe ไม่เหลือแล้ว', g => g.fs.isFile(S + '/report.txt') && !g.fs.exists(S + '/report.exe')]],
     hint1: ['mv'], solution: 'mv report.exe report.txt', cards: [],
     check: g => g.fs.isFile(S + '/report.txt') && !g.fs.exists(S + '/report.exe'),
     nudge: g => g.fs.isFile(S + '/report.txt') && g.fs.exists(S + '/report.exe') && 'มี report.txt แล้ว แต่ report.exe ยังอยู่ เปลี่ยนชื่อ = ของเดิมต้องไม่เหลือ',
@@ -273,8 +302,13 @@ export const LEVELS = [
     setup: fs => bigFiles(fs),
     intro: [['kru', 'ดิสก์เต็ม! ครูเซฟงานไม่ได้เลย ไวรัสปั๊มไฟล์ใหญ่ๆ ไว้แน่ๆ'], ['lam', 'ลองหาไฟล์ที่ใหญ่เกิน 50MB ดูก่อน ยังไม่ต้องลบนะ']],
     mission: 'ค้นหาไฟล์ที่ใหญ่เกิน 50MB',
+    steps: [['ค้นหาเฉพาะไฟล์ที่ใหญ่เกิน 50MB (ไม่มีไฟล์เล็กปน)', g => g.hist.some(r => ['junk1.iso', 'junk2.mp4', 'yearbook_video.mp4'].every(f => r.stdout.includes(f)) && !['poster.png', 'notes.txt'].some(f => r.stdout.includes(f)))]],
     hint1: ['find', '-size', '-type'], solution: 'find . -type f -size +50M', cards: ['find -size'],
-    check: g => ['junk1.iso', 'junk2.mp4', 'yearbook_video.mp4'].every(f => sawOut(g, f)),
+    // One command's output must list exactly the big ones: plain `ls` shows everything, so it doesn't count.
+    check: g => g.hist.some(r => ['junk1.iso', 'junk2.mp4', 'yearbook_video.mp4'].every(f => r.stdout.includes(f)) &&
+      !['poster.png', 'notes.txt'].some(f => r.stdout.includes(f))),
+    nudge: g => ['poster.png', 'notes.txt'].some(f => g.res.stdout.includes(f)) &&
+      'ls โชว์ทุกไฟล์ ทั้งเล็กทั้งใหญ่เลย ภารกิจคือกรองให้เหลือแค่ไฟล์ที่ใหญ่เกิน 50MB นะ',
     outro: [['lam', '-size +50M = ใหญ่เกิน 50MB เจอ 3 ไฟล์ ...แต่เดี๋ยวนะ yearbook_video.mp4 นี่มันวิดีโอรุ่นนี่!']],
   },
   {
@@ -282,6 +316,7 @@ export const LEVELS = [
     setup: fs => bigFiles(fs),
     intro: [['kru', 'ลบไฟล์ขยะใหญ่ๆ ให้ครูทีนะ'], ['lam', 'ก่อนลบเราจะโชว์รายชื่อให้ดูก่อนทุกครั้ง อ่านดีๆ ก่อนกด y นะ']],
     mission: 'ลบไฟล์ขยะที่ใหญ่เกิน 50MB แต่ห้ามลบวิดีโอรุ่น (yearbook_video.mp4)',
+    steps: [['ลบ junk1.iso', g => !g.fs.exists(S + '/storage/junk1.iso')], ['ลบ junk2.mp4', g => !g.fs.exists(S + '/storage/junk2.mp4')], ['วิดีโอรุ่นยังอยู่', g => !g.fs.exists(S + '/storage/junk1.iso') && !g.fs.exists(S + '/storage/junk2.mp4') && g.fs.exists(S + '/storage/yearbook_video.mp4')]],
     hint1: ['rm', 'find -delete'], solution: 'rm junk1.iso junk2.mp4', cards: [],
     check: g => !g.fs.exists(S + '/storage/junk1.iso') && !g.fs.exists(S + '/storage/junk2.mp4') && g.fs.exists(S + '/storage/yearbook_video.mp4'),
     fail: g => !g.fs.exists(S + '/storage/yearbook_video.mp4') && 'วิดีโอรุ่นหายไปแล้ว!! บนเครื่องจริงไม่มีปุ่มย้อนเวลานะ กด "ย้อนเวลา" แล้วลองใหม่',
@@ -301,6 +336,7 @@ export const LEVELS = [
     mission: 'เข้าห้องเซิร์ฟเวอร์ อ่าน system.log หาชื่อไวรัส ลบมัน แล้วปิดเครื่อง',
     hint1: ['cd', 'cat', 'sudo rm', 'sudo poweroff'], solution: 'cd server_room → cat system.log → sudo rm mua.bin → sudo poweroff', cards: [],
     check: g => !g.fs.exists(S + '/server_room/mua.bin') && g.fs.exists(S + '/server_room/router.cfg') && g.sh.flags.poweroff,
+    steps: [['อ่าน system.log', g => sawOut(g, 'กำลังกิน CPU')], ['ลบไฟล์ไวรัส', g => !g.fs.exists(S + '/server_room/mua.bin')], ['ปิดเครื่อง', g => g.sh.flags.poweroff]],
     fail: g => !g.fs.exists(S + '/server_room/router.cfg') && 'ลบ router.cfg ไปด้วย เน็ตทั้งโรงเรียนล่ม! กด "ย้อนเวลา"',
     outro: [['virus', 'อ๊าก! แต่ข้ากัดล่ามจนหลับไปแล้ว คราวนี้เจ้าต้องสู้คนเดียว 👾'], ['lam', 'ง่วง... จัง... ฝากสมุดไว้นะ... zzZ']],
   },
@@ -315,6 +351,7 @@ export const LEVELS = [
       ['root', 'ลองก่อนเลย: ดูว่าในห้องมีอะไร'],
     ],
     mission: 'ดูว่าในห้องมีอะไรบ้าง (พิมพ์คำสั่งจริงเอง)',
+    steps: [['ดูว่าในห้องมีอะไรบ้าง', g => ranOk(g, 'ls')]],
     hint1: ['ls'], solution: 'ls', cards: [],
     check: g => ranOk(g, 'ls'),
     outro: [['root', '127 แปลว่า "ไม่มีคำสั่งนี้ในโลก" และ Linux แยกตัวเล็กตัวใหญ่ LS กับ ls ไม่เหมือนกัน']],
@@ -324,6 +361,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S + '/teachers_room', { 'my notes.txt': 'โน้ตครูสมใจ: พรุ่งนี้สอบ 9 โมง ห้อง 402', 'letter.txt': 'จดหมาย' }),
     intro: [['kru', 'ครูตั้งชื่อไฟล์ว่า my notes.txt มีช่องว่างด้วยนะ อ่านให้ครูที']],
     mission: 'อ่านไฟล์ my notes.txt',
+    steps: [['ดูชื่อไฟล์ในห้อง', g => ranOk(g, 'ls') || sawOut(g, 'พรุ่งนี้สอบ')], ['อ่าน my notes.txt', g => sawOut(g, 'พรุ่งนี้สอบ')]],
     hint1: ['cat', '"..."'], solution: 'cat "my notes.txt"', cards: ['"ชื่อมีช่องว่าง"'],
     check: g => sawOut(g, 'พรุ่งนี้สอบ'),
     outro: [['root', 'ช่องว่างแบ่งคำ cat เลยนึกว่ามี 2 ไฟล์ my กับ notes.txt ครอบด้วย "..." ให้เป็นชื่อเดียว']],
@@ -333,6 +371,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'exam_room': 'ฮ่าๆ ประตูหลอก! นี่คือไฟล์ ไม่ใช่ห้อง — ไวรัสมั่วซั่ว', 'exam_room2/': { 'seats.txt': 'ผังที่นั่งสอบ' } }),
     intro: [['virus', 'ห้องสอบอยู่ทางนี้~ เชิญเข้ามาเลย 👾']],
     mission: 'เข้าไปในห้องสอบตัวจริง',
+    steps: [['ดูว่าทางเดินมีอะไรบ้าง', g => ranOk(g, 'ls') || g.sh.cwd === S + '/exam_room2'], ['เข้าห้องสอบตัวจริง', g => g.sh.cwd === S + '/exam_room2']],
     hint1: ['cd', 'ls'], solution: 'cd exam_room2', cards: [],
     check: g => g.sh.cwd === S + '/exam_room2',
     outro: [['root', 'Not a directory = อันนั้นเป็นไฟล์ เข้าไปข้างในไม่ได้ ls ดูก่อนช่วยได้เยอะ (โฟลเดอร์จะเป็นสีฟ้า)']],
@@ -342,6 +381,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'submit/': {} }),
     intro: [['kru', 'เตรียมโฟลเดอร์ส่งงาน submit/m4/room2 ให้ห้อง ม.4/2 หน่อยจ้า']],
     mission: 'สร้างโฟลเดอร์ submit/m4/room2',
+    steps: [['มี submit', g => g.fs.isDir(S + '/submit')], ['มี submit/m4', g => g.fs.isDir(S + '/submit/m4')], ['มี submit/m4/room2', g => g.fs.isDir(S + '/submit/m4/room2')]],
     hint1: ['mkdir', '-p'], solution: 'mkdir -p submit/m4/room2', cards: [],
     check: g => g.fs.isDir(S + '/submit/m4/room2'),
     outro: [['root', 'missing operand = ขาดของที่ต้องใส่ต่อท้าย บอกให้ครบว่าจะสร้างอะไร']],
@@ -353,6 +393,7 @@ export const LEVELS = [
     mission: 'ก๊อป scores.csv และโฟลเดอร์ lab ไปไว้ใน backup',
     hint1: ['cp', '-r'], solution: 'cp scores.csv backup/  และ  cp -r lab backup/', cards: [],
     check: g => g.fs.isFile(S + '/backup/scores.csv') && g.fs.isFile(S + '/backup/lab/result1.txt'),
+    steps: [['ก๊อป scores.csv ไปไว้ใน backup', g => g.fs.isFile(S + '/backup/scores.csv')], ['ก๊อปโฟลเดอร์ lab ไปไว้ใน backup', g => g.fs.isFile(S + '/backup/lab/result1.txt')]],
     outro: [['root', 'missing destination = ลืมบอกปลายทาง, -r not specified = ลืมบอกว่าเอาทั้งโฟลเดอร์ สองอันนี้เจอบ่อยสุดแล้ว']],
   },
   {
@@ -360,6 +401,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'club/': { 'members.txt': 'สมาชิก', 'old/': {} } }),
     intro: [['virus', 'เก็บ club เข้าไปไว้ใน club/old สิ เรียบร้อยดีออก 👾'], ['kru', 'ครูแค่อยากให้เก็บโฟลเดอร์ club เป็นชื่อ archive_club นะ']],
     mission: 'ย้ายโฟลเดอร์ club ไปเป็น archive_club',
+    steps: [['มี archive_club แล้ว', g => g.fs.isDir(S + '/archive_club')], ['club เดิมไม่เหลือแล้ว', g => g.fs.isFile(S + '/archive_club/members.txt') && !g.fs.exists(S + '/club')]],
     hint1: ['mv'], solution: 'mv club archive_club', cards: [],
     check: g => g.fs.isFile(S + '/archive_club/members.txt') && !g.fs.exists(S + '/club'),
     nudge: g => g.fs.isDir(S + '/archive_club') && g.fs.exists(S + '/club') && 'archive_club มีแล้ว แต่ club ยังอยู่ ครูให้ย้าย ไม่ใช่ก๊อป',
@@ -370,6 +412,7 @@ export const LEVELS = [
     setup: fs => fs.tree(S, { 'homework.txt': 'การบ้าน', 'big_video.mp4': { content: 'x', size: 88_000_000 }, 'photos/': {} }),
     intro: [['root', 'พี่จะไม่บอกแล้ว ls มีตัวเลือกดูรายละเอียดไฟล์ (ขนาด เจ้าของ) ลองหาจากคู่มือ ls --help เอง']],
     mission: 'ใช้ ls แบบแสดงรายละเอียด (ขนาดไฟล์ เจ้าของ)',
+    steps: [['ดูไฟล์แบบแสดงรายละเอียด', g => ranOk(g, 'ls', c => c.args.some(a => /^-[a-zA-Z]*l/.test(a)))]],
     hint1: ['ls --help', 'man ls'], solution: 'ls -l', cards: ['--help'],
     check: g => ranOk(g, 'ls', c => c.args.some(a => /^-[a-zA-Z]*l/.test(a))),
     outro: [['root', 'ติดตรงไหน --help ช่วยได้เสมอ คนเก่งไม่ได้จำทุกอย่าง แต่รู้ว่าต้องไปหาที่ไหน']],
@@ -381,6 +424,12 @@ export const LEVELS = [
     mission: 'อ่าน vault/exam.txt, ลบไฟล์ .trap ทั้งหมดใน vault (ของอื่นห้ามหาย) แล้วปิดเครื่อง',
     hint1: ['cat', 'sudo', 'find', 'rm -i', 'poweroff'], solution: 'sudo cat vault/exam.txt → find vault -name "*.trap" → rm -i vault/x.trap vault/drawer/y.trap → sudo poweroff', cards: [],
     check: g => sawOut(g, 'ข้อสอบกลางภาค') && !g.fs.exists(S + '/vault/x.trap') && !g.fs.exists(S + '/vault/drawer/y.trap') && g.fs.exists(S + '/vault/drawer/pens.txt') && g.fs.exists(S + '/vault/exam.txt') && g.sh.flags.poweroff,
+    steps: [
+      ['อ่าน vault/exam.txt', g => sawOut(g, 'ข้อสอบกลางภาค')],
+      [g => `ลบไฟล์ .trap ทั้งหมด (${[S + '/vault/x.trap', S + '/vault/drawer/y.trap'].filter(p => !g.fs.exists(p)).length}/2)`,
+        g => !g.fs.exists(S + '/vault/x.trap') && !g.fs.exists(S + '/vault/drawer/y.trap')],
+      ['ปิดเครื่อง', g => g.sh.flags.poweroff],
+    ],
     fail: g => (!g.fs.exists(S + '/vault/exam.txt') || !g.fs.exists(S + '/vault/drawer/pens.txt')) && 'ลบของสำคัญไปด้วย! กด "ย้อนเวลา"',
     outro: [['root', 'ผ่านเฟส 4! ตอนนี้น้องอ่าน error เองได้แล้ว ต่อไปพี่จะสอนต่อคำสั่งหลายตัวเข้าด้วยกัน']],
   },
@@ -394,6 +443,7 @@ export const LEVELS = [
       ['root', 'เราจะต่อ "ท่อ" | (Shift + \\) ให้ผลของ ls ไหลไปเข้าเครื่องนับ wc -l (นับบรรทัด)'],
     ],
     mission: 'นับว่าในรังมีไฟล์ทั้งหมดกี่ไฟล์ โดยต่อท่อ ls เข้า wc -l',
+    steps: [['ดูไฟล์ในรัง', g => ranOk(g, 'ls')], ['ต่อท่อ ls เข้า wc -l ให้ได้ตัวเลข', g => g.hist.some(r => r.stdout.trim() === '137')]],
     hint1: ['|', 'wc -l'], solution: 'ls | wc -l', cards: ['|', 'wc -l'],
     check: g => lastOut(g) === '137',
     outro: [['root', '137 ตัว! ท่อ | คือเอาผลของคำสั่งซ้ายไปเป็นของกินของคำสั่งขวา']],
@@ -403,6 +453,7 @@ export const LEVELS = [
     setup: fs => nest(fs),
     intro: [['root', 'ในรังมีไฟล์ log ปนอยู่ด้วย เราอยากรู้เฉพาะตัวที่ชื่อมี mua ใช้ grep กรองก่อน แล้วค่อยนับ']],
     mission: 'นับเฉพาะไฟล์ที่ชื่อมีคำว่า mua (ต่อท่อ 2 ต่อ)',
+    steps: [['กรองเฉพาะชื่อที่มี mua ด้วย grep', g => ranOk(g, 'grep')], ['ต่อท่ออีกต่อไปนับให้ได้ตัวเลข', g => g.hist.some(r => r.stdout.trim() === '89' && r.line.includes('|'))]],
     hint1: ['grep', '|', 'wc -l'], solution: 'ls | grep mua | wc -l', cards: ['grep'],
     check: g => lastOut(g) === '89' && g.res.line.includes('|'),
     outro: [['root', 'ต่อท่อกี่ต่อก็ได้ ข้อมูลไหลจากซ้ายไปขวาเหมือนสายพาน']],
@@ -413,7 +464,21 @@ export const LEVELS = [
     intro: [['root', 'ไวรัสซ่อน flag.txt ไว้ที่ไหนสักแห่งในเครื่อง ลองค้นทั้งเครื่องตั้งแต่ / ดูเลย']],
     mission: 'หา flag.txt ทั้งเครื่อง โดยให้จอสะอาด ไม่มีคำบ่น Permission denied',
     hint1: ['find /', '2>/dev/null'], solution: 'find / -name flag.txt 2>/dev/null', cards: ['2>/dev/null'],
-    check: g => g.res.stdout.includes('/var/backups/.old/flag.txt') && g.res.stderr === '',
+    check: g => cleanFlag(g.res),
+    steps: [
+      ['ค้นหา flag.txt ทั้งเครื่อง (เริ่มที่ /)', g => g.hist.some(onlyFlag)],
+      ['ค้นอีกรอบให้จอสะอาด ไม่มีคำบ่นเลย', g => g.hist.some(cleanFlag)],
+    ],
+    // Searching from / always "fails" (exit 1) because of Permission denied, so these hints run on errors.
+    errNudge: g => {
+      const r = g.res;
+      if (/Permission denied/.test(r.stderr) && onlyFlag(r))
+        return 'เจอแล้ว! แต่จอเต็มไปด้วย Permission denied ข้อความบ่นพวกนี้ไหลออกทางช่องที่ 2 (stderr) คนละช่องกับผลลัพธ์ ต่อท้ายคำสั่งเดิมด้วย 2>/dev/null เพื่อเทคำบ่นลงหลุมดำ';
+      if (/Permission denied/.test(r.stderr))
+        return 'ค้นจาก / ถูกแล้ว แต่ยังไม่ได้บอกชื่อไฟล์ ใส่ -name flag.txt ด้วย';
+      if (r.cmds.some(c => c.name === 'find') && /No such file or directory/.test(r.stderr))
+        return 'find ต้องบอกที่เริ่มค้นก่อน แล้วค่อยบอกชื่อ: find <เริ่มจากไหน> -name <ชื่อไฟล์>  ภารกิจนี้ให้ค้นทั้งเครื่อง = เริ่มที่ /';
+    },
     outro: [['root', '2> = ช่องข้อความบ่น (stderr) /dev/null = หลุมดำ ทิ้งลงไปแล้วหายเลย เหลือแต่ผลที่อยากได้']],
   },
   {
@@ -422,11 +487,19 @@ export const LEVELS = [
     intro: [['kru', 'ครูอยากได้ "รายชื่อไฟล์ใหญ่เกิน 50MB ใน Downloads" เป็นไฟล์ชื่อ big_list.txt ไว้เปิดดูทีหลัง'], ['root', 'ใช้ > เทผลลงไฟล์แทนที่จะขึ้นจอ']],
     mission: 'เก็บรายชื่อไฟล์ใน ~/Downloads ที่ใหญ่เกิน 50MB ลงไฟล์ big_list.txt',
     hint1: ['find', '-size', '>'], solution: 'find ~/Downloads -type f -size +50M > big_list.txt', cards: ['>'],
-    check: g => {
-      const t = g.fs.read(HOME + '/big_list.txt') || '';
-      return ['movie_night.mp4', 'ubuntu.iso', 'old_backup.zip'].every(f => t.includes(f)) && !t.includes('song.mp3') && !t.includes('homework.pdf');
+    check: g => bigOnly(g.fs.read(HOME + '/big_list.txt')),
+    steps: [
+      ['กรองให้เหลือเฉพาะไฟล์ที่ใหญ่เกิน 50MB', g => g.hist.some(r => bigOnly(r.stdout)) || bigOnly(g.fs.read(HOME + '/big_list.txt'))],
+      ['เทผลลงไฟล์ big_list.txt ด้วย >', g => bigOnly(g.fs.read(HOME + '/big_list.txt'))],
+    ],
+    nudge: g => {
+      const t = g.fs.read(HOME + '/big_list.txt');
+      if (bigOnly(g.res.stdout)) return 'รายชื่อบนจอถูกแล้ว! แต่มันไหลขึ้นจอ ไม่ได้ลงไฟล์ เติม > ~/big_list.txt ต่อท้ายคำสั่งเดิม';
+      if (t != null && SMALL.some(f => t.includes(f)))
+        return 'big_list.txt มีแล้ว แต่ข้างในมีไฟล์เล็ก (song.mp3, homework.pdf) ปนมาด้วย เพราะ ls เอาทุกไฟล์ ต้องใช้คำสั่งที่กรองขนาดได้ (แบบด่าน 3-6) แล้วค่อยเทผลลงไฟล์ด้วย > (เขียนทับของเดิมได้เลย)';
+      if (t != null && !bigOnly(t)) return 'big_list.txt มีแล้ว แต่รายชื่อข้างในยังไม่ครบ ลอง cat big_list.txt ดู';
+      if (t == null && SMALL.some(f => g.res.stdout.includes(f))) return 'ls โชว์ทุกไฟล์ ทั้งเล็กทั้งใหญ่ ครูอยากได้เฉพาะไฟล์ที่ใหญ่เกิน 50MB ต้องกรองก่อน';
     },
-    nudge: g => !g.fs.exists(HOME + '/big_list.txt') && /ubuntu\.iso/.test(g.res.stdout) && 'รายชื่อถูกแล้ว แต่ไหลขึ้นจอ ไม่ได้ลงไฟล์ ครูอยากได้เป็นไฟล์ big_list.txt',
     outro: [['root', 'สังเกตว่าไม่มีอะไรขึ้นจอ เพราะไหลลงไฟล์หมด ระวัง: > เขียนทับของเดิม >> ต่อท้าย']],
   },
   {
@@ -437,6 +510,7 @@ export const LEVELS = [
     },
     intro: [['kru', 'ครูเช็กรายชื่อใน big_list.txt แล้ว ลบได้ทั้งหมดเลย'], ['root', 'xargs = สายพาน เอาทุกคำที่ไหลมาในท่อไปต่อท้ายคำสั่ง ดูรายการก่อนนะ แล้วค่อยส่งเข้า xargs rm']],
     mission: 'ลบทุกไฟล์ที่อยู่ในรายชื่อ big_list.txt โดยใช้ xargs',
+    steps: [['ส่งรายชื่อเข้า xargs rm', g => !g.fs.exists(HOME + '/Downloads/ubuntu.iso') && g.hist.some(r => r.line.includes('xargs'))], ['song.mp3 ยังอยู่', g => !g.fs.exists(HOME + '/Downloads/ubuntu.iso') && g.fs.exists(HOME + '/Downloads/song.mp3')]],
     hint1: ['cat', '|', 'xargs rm'], solution: 'cat big_list.txt | xargs rm', cards: ['xargs'],
     check: g => !g.fs.exists(HOME + '/Downloads/ubuntu.iso') && !g.fs.exists(HOME + '/Downloads/movie_night.mp4') && !g.fs.exists(HOME + '/Downloads/old_backup.zip') && g.fs.exists(HOME + '/Downloads/song.mp3') && g.hist.some(r => r.line.includes('xargs')),
     fail: g => (!g.fs.exists(HOME + '/Downloads/song.mp3') || !g.fs.exists(HOME + '/Downloads/homework.pdf')) && 'ไฟล์ที่ไม่อยู่ในรายการหายไปด้วย! กด "ย้อนเวลา"',

@@ -1,3 +1,7 @@
 logs/
 server.log
 __pycache__/
+# kept locally only: images of unknown licence, cj's private design doc
+static/img/
+assets/
+docs/

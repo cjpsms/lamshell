@@ -7,43 +7,76 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐧</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cascadia+Mono:wght@400;700&family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/",
+  "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@3.5.5/lib/three-vrm.module.min.js"
+} }
+</script>
 </head>
 <body>
-<header>
-  <div class="logo">🐧 <b>ล่ามเชลล์</b> <span>LamShell</span></div>
-  <div class="hright"><span id="total"></span><span id="ai" class="ai">AI …</span></div>
-</header>
 <main>
   <aside>
-    <section class="lvcard">
+    <div class="brand">
+      <b>🐧 ล่ามเชลล์</b>
+      <span id="total"></span>
+      <span id="ai" class="ai">AI …</span>
+    </div>
+
+    <div id="cast" class="cast">
+      <canvas hidden></canvas>
+      <img alt="" hidden>
+      <div class="cast-name who-lam">น้องล่าม</div>
+    </div>
+
+    <section class="level">
       <div class="lvtop"><span id="lvid"></span><span id="lvstars"></span></div>
       <h1 id="lvtitle"></h1>
       <div id="lvphase" class="muted"></div>
-      <div class="missionbox"><div class="label">🎯 ภารกิจ</div><div id="mission"></div></div>
+      <div class="mission"><div class="label">ภารกิจ</div><div id="mission"></div><ul id="steps" class="steps"></ul></div>
       <div class="actions">
         <button id="hint"></button>
-        <button id="reset" title="รีเซ็ตโลกของด่านนี้">⏪ ย้อนเวลา</button>
+        <button id="reset" title="รีเซ็ตโลกของด่านนี้">ย้อนเวลา</button>
       </div>
       <div id="hintnote" class="muted small"></div>
     </section>
-    <section>
-      <div class="label">ด่านทั้งหมด</div>
+
+    <section id="feed" class="feed" aria-live="polite"></section>
+
+    <details class="more">
+      <summary>ด่านทั้งหมด · การ์ดคำสั่ง</summary>
       <div id="map"></div>
-    </section>
-    <section>
       <div class="label">การ์ดคำสั่ง</div>
       <div id="cards"></div>
-    </section>
-    <button id="wipe" class="linkbtn">ล้างความคืบหน้า</button>
+      <button id="wipe" class="linkbtn">ล้างความคืบหน้า</button>
+      <div class="credit">ตัวละคร 3D: cj (สร้างจาก VRoid Studio sample model)</div>
+    </details>
   </aside>
-  <div class="termwrap">
-    <div id="term">
-      <div id="lines"></div>
-      <div class="inrow"><span id="pcwd" class="pcwd"></span><span id="plabel" class="plabel"></span><input id="cmd" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+
+  <div class="stage">
+    <div class="wt">
+      <div class="wt-bar">
+        <div class="wt-tab">
+          <span class="wt-icon">🐧</span>
+          <span id="tabtitle" class="wt-title"></span>
+          <span class="wt-x"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></span>
+        </div>
+        <span class="wt-btn"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1"><path d="M6 .5v11M.5 6h11"/></svg></span>
+        <span class="wt-btn wt-drop"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.1"><path d="M1.5 3.5l3.5 3.5 3.5-3.5"/></svg></span>
+        <span class="wt-drag"></span>
+        <span class="wt-ctl"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><path d="M0 5.5h10"/></svg></span><span class="wt-ctl"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><rect x=".5" y=".5" width="9" height="9" rx="1"/></svg></span><span class="wt-ctl close"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><path d="M.5.5l9 9M9.5.5l-9 9"/></svg></span>
+      </div>
+      <div class="termwrap">
+        <div id="term">
+          <div id="lines"></div>
+          <div class="inrow"><span id="pcwd" class="pcwd"></span><span id="plabel" class="plabel"></span><input id="cmd" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        </div>
+        <div id="overlay" class="overlay"></div>
+      </div>
     </div>
-    <div id="overlay" class="overlay"></div>
   </div>
 </main>
 <script type="module" src="js/game.js"></script>

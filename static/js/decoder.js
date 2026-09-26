@@ -66,6 +66,11 @@ export function decode(line) {
         d.why = 'ไม่มีโฟลเดอร์ปลายทางนี้';
         d.tip = 'เช็กว่าโฟลเดอร์ปลายทางมีอยู่จริง (ls ดู) และ path ถูกต้องเทียบกับที่ที่เราอยู่ตอนนี้';
       }
+      // find's first argument is where to START searching, not the name: `find flag.txt` looks for a folder called flag.txt
+      if (who === 'find' && /No such file/.test(reason)) {
+        d.why = `find ใช้ '${what}' เป็นที่เริ่มค้น แต่ไม่มีที่ชื่อนี้`;
+        d.tip = 'find ต้องบอกที่เริ่มค้นก่อน แล้วค่อยบอกชื่อ: find <เริ่มจากไหน> -name <ชื่อไฟล์>  เช่น find . -name notes.txt';
+      }
       if (what.startsWith('~')) d.tip = '~ ที่อยู่ใน "..." จะไม่ถูกแปลงเป็นบ้าน (/home/student) กลายเป็นโฟลเดอร์ชื่อ ~ ตรงๆ ให้เอา ~ ไว้นอกเครื่องหมายคำพูด';
       return d;
     }

@@ -23,6 +23,9 @@ The selling point is **learning to read errors**: every error is the exact GNU c
 - `server.py`: stdlib-only Python server. Interprets player input with Claude Haiku through the `claude` CLI
   (no API key, no tools), with hard guards so the AI never adds `sudo`, chains extra steps, or changes the command
   the player chose.
+- `static/js/stage.js`: the character stage. The speaker shows as a VRM model (three.js + three-vrm) that blinks,
+  breathes, changes expression and moves its mouth while talking. Models in `static/models/` were made by cj in
+  VRoid Studio from VRoid sample models (VRoidPreset A-Z terms: free use, not CC0).
 - `static/js/levels.js`: 38 levels (phases 1–4 + bridge). Each builds its own world and passes on the *state of the
   world*, not on matching the exact text typed.
 
@@ -36,6 +39,9 @@ Needs Python 3 and a logged-in [Claude Code](https://claude.com/claude-code) CLI
 ```
 
 sudo password in the game: `pass123`
+
+UI: a Windows Terminal lookalike for the shell; everything the game says (dialogue, hints, error decoder,
+yes/no questions, mission checklist) lives in the side panel so `clear` never wipes it.
 
 ## Not done yet
 
