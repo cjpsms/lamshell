@@ -1,0 +1,18 @@
+# Voices designed from how each VRM model looks (not their story role). persona <= 64 chars.
+VOICES = {
+  "lam": dict(display_name="nong-lam", gender="female", pitch="high",
+    persona="Lively streetwear style, purple twin tails",
+    input="A lively young Thai woman with a streetwear style: bright, bouncy and energetic, confident and playful, quick cheerful delivery, sounds like she is smiling. Bangkok Thai accent."),
+  "kru": dict(display_name="kru-somjai", gender="female", pitch="medium",
+    persona="Soft-spoken, brown bob, cream cardigan",
+    input="A soft, sweet young Thai woman with a gentle, airy voice: calm and kind, unhurried, polite and a little shy, warm like a cardigan on a cool morning."),
+  "root": dict(display_name="phi-root", gender="male", pitch="low",
+    persona="Cool and calm, dark techwear",
+    input="A cool young Thai man in dark techwear: low, smooth and laid-back, few words, quietly confident, a hint of dry humor, never shouts."),
+  "lung": dict(display_name="lung-ek", gender="male", pitch="medium",
+    persona="Sporty and upbeat, black track jacket",
+    input="A sporty young Thai man in a track jacket: bright, friendly and upbeat, energetic like a PE coach, clear and loud enough, easy laugh."),
+  "virus": dict(display_name="silver-techwear", gender="female", pitch="medium",
+    persona="Cool and composed, silver hair, techwear coat",
+    input="A cool, confident young Thai woman: a slightly low, smooth voice, relaxed and composed, with a playful tone."),
+}

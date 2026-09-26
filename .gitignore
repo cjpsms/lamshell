@@ -5,3 +5,5 @@ __pycache__/
 static/img/
 assets/
 docs/
+tools/voices/voice_ids.json
+tools/voices/raw/

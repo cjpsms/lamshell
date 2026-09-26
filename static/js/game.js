@@ -1,8 +1,11 @@
-import { baseFS, sizeOf } from './vfs.js';
+import { sizeOf } from './vfs.js';
 import { Shell } from './shell.js';
 import { decode } from './decoder.js';
 import { interpret, aiStatus, hasThai, fromKedmanee } from './translate.js';
 import { LEVELS, PHASES, STRICT, PHASE_ORDER, phaseLabel } from './levels.js';
+import { isMuted, setMuted } from './voice.js';
+import { worldFor, saveWorld, levelStart, forgetWorld, keptFiles, restoreKept } from './world.js';
+import { logInput, clearJournal } from './journal.js';
 
 const WHO = {
   lam: ['น้องล่าม', '🐧'], kru: ['ครูสมใจ', '👩‍🏫'], root: ['พี่รูท', '🧑‍💻'],
@@ -26,6 +29,10 @@ if (progress.unlockedId) {
   const i = LEVELS.findIndex(l => l.id === progress.unlockedId);
   if (i >= 0) progress.unlocked = i;
 }
+// The final level was called 5-7 before it became LAST.
+if (progress.unlockedId === '5-7') progress.unlockedId = 'LAST';
+if (progress.stars['5-7']) { progress.stars.LAST = progress.stars['5-7']; delete progress.stars['5-7']; }
+if (progress.unlockedId === 'LAST') progress.unlocked = LEVELS.length - 1;
 progress.unlockedId = LEVELS[Math.min(progress.unlocked, LEVELS.length - 1)].id;
 const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch {} };
 
@@ -90,7 +97,7 @@ import('./stage.js').then(m => {
   earlyLines.splice(0).forEach(a => m.speak(...a));
 }).catch(e => console.warn('stage off:', e));
 
-const SCENE_NAMES = { intro: 'เปิดเรื่อง: ปี 2050', nowake: 'น้องล่ามไม่ตื่น', ending: 'ตอนจบ' };
+const SCENE_NAMES = { intro: 'เปิดเรื่อง: ปี 2050', nowake: 'น้องล่ามไม่ตื่น', timeskip: 'สามเดือนต่อมา', ending: 'ตอนจบ' };
 // Story cutscenes (full screen, 3D). Also optional: without them the levels still play.
 const cutscenes = import('./cutscene.js').catch(e => { console.warn('cutscenes off:', e); return null; });
 async function cutscene(name) {
@@ -192,14 +199,20 @@ async function submit(v) {
     const p = pending; pending = null; setPrompt(); p.resolve(v);
     return;
   }
-  if (busy || !L) return;
+  if (busy || building || !L) return;
   const text = v.trim();
   add(promptHTML() + esc(v), 'echo');
   if (!text) return;
   history.push(text); histPos = history.length;
   busy = true;
   input.classList.add('busy');
-  try { await handle(text); }
+  const lvAt = L.lv, histAt = L.hist.length;
+  try {
+    await handle(text);
+    const ran = L.lv === lvAt && L.hist.length > histAt ? L.hist[L.hist.length - 1] : null;
+    // Only the real playthrough becomes น้องล่าม's memories, not replays.
+    if (L.live) logInput({ lv: lvAt.id, phase: lvAt.phase, said: text, ran: ran?.line || null, code: ran ? ran.code : null });
+  }
   catch (e) { console.error(e); sys('เกมสะดุด: ' + e.message, 'fail'); }
   finally { busy = false; input.classList.remove('busy'); setPrompt(); input.focus(); }
 }
@@ -229,12 +242,20 @@ function aiReq(text) {
   };
 }
 
-async function loadLevel(idx, { replay = false } = {}) {
+let loading = 0, building = false;
+async function loadLevel(idx, { replay = false, reset = false } = {}) {
   const lv = LEVELS[idx];
-  const fs = baseFS();
-  lv.setup(fs);
+  const token = ++loading;
+  // The level at the front of progress plays on the real, saved machine; older levels on a rebuilt copy.
+  const live = idx === progress.unlocked;
+  building = true;   // commands typed while the machine is being built would land on the old level
+  input.classList.add('busy');
+  let fs;
+  try { fs = (reset && live && levelStart(lv.id)) || await worldFor(idx, live); }
+  finally { if (token === loading) { building = false; input.classList.remove('busy'); } }
+  if (token !== loading) return;   // another level was picked while this one was being built
   const sh = new Shell(fs, io, { cwd: lv.cwd, password: lv.password || 'pass123', programs: lv.programs });
-  L = { idx, lv, fs, sh, hist: [], attempts: 0, aiUsed: 0, typedReal: false, hint: 0, decoderOpened: false, passed: false, shownPower: false };
+  L = { idx, lv, fs, sh, live, kept: keptFiles(fs), hist: [], attempts: 0, aiUsed: 0, typedReal: false, hint: 0, decoderOpened: false, passed: false, shownPower: false };
   // A question left open in the previous level (sudo password, y/n) must not swallow this level's first command.
   // Drop it without resolving: resolving would let the old level's command carry on and print into this one.
   if (pending) { pending = null; busy = false; input.classList.remove('busy'); }
@@ -249,6 +270,7 @@ async function loadLevel(idx, { replay = false } = {}) {
   stage?.setAsleep(lamAsleep());
   const first = LEVELS.findIndex(x => x.phase === lv.phase) === idx;
   sys('📍 ' + lv.place);
+  if (!live) sys('(เล่นซ้ำ: เครื่องนี้จำลองตามเนื้อเรื่องตอนด่านนี้ ทำอะไรก็ไม่กระทบเครื่องจริงของเธอ)');
   if (first && !replay) sys(`— ${phaseLabel(lv.phase)}: ${PHASES[lv.phase].name} — ${PHASES[lv.phase].lam}`, 'phase');
   if (replay) sys('⏪ ย้อนเวลาแล้ว โลกกลับเป็นเหมือนตอนเริ่มด่าน', 'phase');
   else for (const [who, t] of lv.intro) { say(who, t); await sleep(250); }
@@ -424,6 +446,12 @@ async function run(line, translated = false) {
   renderDecoder(res.stderr);
   if (L.sh.flags.wiped) return wipedScene();
   if (L.sh.flags.poweroff && !L.shownPower) { L.shownPower = true; await powerScene(); }
+  const back = restoreKept(L.fs, L.kept);
+  if (back.length) {
+    const names = back.map(p => p.split('/').pop()).join(', ');
+    say('kru', `เดี๋ยวๆ! จะลบไฟล์งานของครูทำไมจ๊ะ (${names}) ครูกู้คืนจากสำรองให้แล้วนะ แต่เครื่องจริงลบแล้วหายเลย ระวังด้วย`);
+  }
+  if (L.live) saveWorld(L.lv.id, L.fs);
   checkLevel();
   renderSteps();
   return res;
@@ -476,7 +504,7 @@ async function wipedScene() {
   ov.innerHTML = '<div>💥 ป้าเซิร์ฟพังทั้งเครื่อง!</div><div class="small">rm -rf --no-preserve-root / ลบทุกอย่างตั้งแต่ราก ในเครื่องจริงไม่มีปุ่มย้อนเวลา<br>ครั้งนี้เกมย้อนเวลาให้ แต่ห้ามทำบนเครื่องจริงเด็ดขาด</div>';
   await sleep(4000);
   ov.className = 'overlay';
-  loadLevel(L.idx, { replay: true });
+  loadLevel(L.idx, { replay: true, reset: true });
 }
 
 // ---------- pass / stars / hints ----------
@@ -617,7 +645,10 @@ async function pass() {
   save();
   for (const [who, t] of L.lv.outro || []) { await sleep(200); say(who, t); }
   if (L.lv.lamSleeps) stage?.setAsleep(true);
-  if (L.lv.cutsceneAfter) { await sleep(L.lv.outro?.length ? 2500 : 600); await cutscene(L.lv.cutsceneAfter); }
+  if (L.lv.cutsceneAfter) {
+    await sleep(L.lv.outro?.length ? 2500 : 600);
+    for (const name of [].concat(L.lv.cutsceneAfter)) await cutscene(name);
+  }
   stage?.setAsleep(lamAsleep() || !!L.lv.lamSleeps);
   const cards = (L.lv.cards || []).map(c => `<span class="cardchip">${esc(c)}</span>`).join(' ');
   const el = note(`<div class="passbox"><div class="pt">✅ ผ่านด่าน ${esc(id)}</div>` +
@@ -626,7 +657,7 @@ async function pass() {
     `<div class="why">${esc(starWhy())}</div>` +
     `<div class="btns">${L.idx < LEVELS.length - 1 ? '<button class="next">ด่านถัดไป →</button>' : ''}<button class="again">เล่นด่านนี้อีกรอบ</button></div></div>`, 'pass');
   el.querySelector('.next')?.addEventListener('click', () => loadLevel(L.idx + 1));
-  el.querySelector('.again').addEventListener('click', () => loadLevel(L.idx, { replay: true }));
+  el.querySelector('.again').addEventListener('click', () => loadLevel(L.idx, { replay: true, reset: true }));
   if (L.lv.phase === 1 && L.stars < 3 && L.lastTranslated && L.hint < 3) {
     L.challenge = true;
     sys(`⭐ ท้าพิมพ์เอง: พิมพ์คำสั่งจริง (บรรทัดสีเทา ↳ ในเทอร์มินัล) ด้วยมือตัวเองเพื่อรับดาวที่ 3`, 'mission');
@@ -678,8 +709,9 @@ function renderSteps() {
   const el = $('#steps');
   if (!L.lv.steps) { el.innerHTML = ''; return; }
   const g = { fs: L.fs, sh: L.sh, res: L.hist[L.hist.length - 1], hist: L.hist };
-  el.innerHTML = L.lv.steps.map(([t, done]) =>
-    `<li class="${done(g) ? 'ok' : ''}">${esc(typeof t === 'function' ? t(g) : t)}</li>`).join('');
+  // Optional steps (good habits like "look before you delete") are marked as recommended, never as missing.
+  el.innerHTML = L.lv.steps.map(([t, done, o]) =>
+    `<li class="${done(g) ? 'ok' : o?.optional ? 'opt' : ''}">${esc(typeof t === 'function' ? t(g) : t)}${o?.optional ? ' <small>(แนะนำ)</small>' : ''}</li>`).join('');
 }
 
 function renderSide() {
@@ -731,11 +763,17 @@ function renderSide() {
 }
 
 $('#hint').onclick = useHint;
-$('#reset').onclick = () => L && loadLevel(L.idx, { replay: true });
+const soundBtn = $('#sound');
+const showSound = () => { soundBtn.textContent = isMuted() ? '🔇' : '🔊'; soundBtn.title = isMuted() ? 'เปิดเสียงพากย์' : 'ปิดเสียงพากย์'; };
+soundBtn.onclick = () => { setMuted(!isMuted()); showSound(); };
+showSound();
+$('#reset').onclick = () => L && loadLevel(L.idx, { replay: true, reset: true });
 $('#wipe').onclick = () => {
   if (!confirm('ล้างความคืบหน้าทั้งหมด (ดาว/การ์ด) ใช่ไหม?')) return;
   progress = { unlocked: 0, unlockedId: LEVELS[0].id, stars: {}, cards: [], seen: {} };
   save();
+  forgetWorld();
+  clearJournal();
   loadLevel(0);
 };
 

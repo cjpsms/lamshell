@@ -48,8 +48,14 @@ yes/no questions, mission checklist) lives in the side panel so `clear` never wi
 
 Year 2050: น้องล่าม, the interpreter, lives in every computer until the virus มั่วซั่ว starts eating her language.
 She fades phase by phase, falls asleep after phase 3, gets rescued from `/quarantine` in a 4-level rescue arc,
-and wakes up at the end of phase 5. Three 3D cutscenes (`static/js/cutscene.js`) tell it.
+and, three months later, wakes up in the last act. 3D cutscenes (`static/js/cutscene.js`) tell it.
+
+The whole game is one machine (`static/js/world.js`): every file the levels use is there from the start, the story
+adds the virus's files as it goes, and what the player does carries over (delete a work file and ครูสมใจ restores it).
+น้องล่าม's memory files are written from what the player actually typed (`static/js/journal.js`).
+
+Voice acting: every fixed line is voiced (ElevenLabs, `static/voice/`, built by `tools/voices/`).
 
 ## Not done yet
 
-Phase 5 levels 5-1..5-6 (helping ครูสมใจ), checkpoint quizzes, user login / per-student logging, teacher dashboard.
+Checkpoint quizzes, user login / per-student logging, teacher dashboard.

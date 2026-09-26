@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { playVoice, stopVoice } from './voice.js';
 
 const MODELS = {
   lam: 'models/lam.vrm', kru: 'models/kru.vrm', root: 'models/root.vrm', lung: 'models/lung.vrm', virus: 'models/virus.vrm',
@@ -64,7 +65,7 @@ export function speak(who, name, text, m = 'neutral', { now = false } = {}) {
 // The current line's timer; calling it ends the line early.
 let cutLine = null;
 let wasCut = false;
-const lineWait = ms => new Promise(r => { const t = setTimeout(r, ms); cutLine = () => { clearTimeout(t); wasCut = true; r(); }; });
+const lineWait = ms => new Promise(r => { const t = setTimeout(r, ms); cutLine = () => { clearTimeout(t); wasCut = true; stopVoice(); r(); }; });
 
 async function play() {
   playing = true;
@@ -87,7 +88,9 @@ async function play() {
     }
     box.classList.remove('swap');
     mood = m;
-    talkUntil = performance.now() + dur;
+    const voiced = await playVoice(who, text);   // voiced line: its real length decides how long we talk
+    if (voiced) dur = voiced + 250;
+    talkUntil = performance.now() + (voiced || dur);
     wasCut = false;
     await lineWait(dur);
     cutLine = null;
@@ -215,7 +218,7 @@ function tick() {
 }
 
 // New level: drop lines still waiting from the previous one.
-export function clearQueue() { queue.length = 0; cutLine?.(); talkUntil = 0; }
+export function clearQueue() { queue.length = 0; cutLine?.(); talkUntil = 0; stopVoice(); }
 
 export function setAsleep(v) { asleep = !!v; }
 

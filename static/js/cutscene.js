@@ -3,6 +3,7 @@
 // Everything is animated in code (bone rotations), so no video or motion files are needed.
 import * as THREE from 'three';
 import { load, lend, giveBack, restPose, POSED } from './stage.js';
+import { playVoice, stopVoice } from './voice.js';
 
 const NAMES = { lam: 'น้องล่าม', kru: 'ครูสมใจ', root: 'พี่รูท', lung: 'ลุงภารโรงเอก', virus: 'ไวรัสมั่วซั่ว' };
 const MOODS = ['happy', 'angry', 'sad', 'surprised', 'relaxed'];
@@ -252,14 +253,15 @@ const S = {
     check();
     const a = actors.get(who);
     if (pose && a) S.pose(who, pose);
-    const dur = ms || Math.min(6500, Math.max(2200, 900 + [...text].length * 65));
+    const voiced = await playVoice(who, text);
+    const dur = ms || voiced || Math.min(6500, Math.max(2200, 900 + [...text].length * 65));
     if (a) a.talkUntil = performance.now() + dur;
     const sub = el.querySelector('.cs-sub');
     sub.hidden = false;
     sub.className = 'cs-sub who-' + who;
     sub.querySelector('b').textContent = NAMES[who] || who;
     sub.querySelector('span').textContent = text;
-    await waitOrClick(dur + 900);
+    try { await waitOrClick(dur + 900); } finally { stopVoice(); }   // a click moves on and cuts the audio too
     if (a) a.talkUntil = 0;
     sub.hidden = true;
   },
@@ -332,8 +334,14 @@ const SCRIPTS = {
     S.fx('glitch', 700);
     await S.say('virus', 'หลับยาวไปเลยล่ามน้อย ฮ่าๆๆ 👾', { pose: 'laugh' });
     S.exit('virus', 'right');
-    await S.caption('ต่อไป: เฟส 5 ภารกิจประยุกต์', 2200);
   },
+
+  // After R4 too: just the time skip.
+  async timeskip() {
+    S.bg('dark');
+    await S.caption('3 เดือนต่อมา...', 3000);
+  },
+
 
   // After 5-7: the blocks are gone, she wakes up.
   async ending() {
@@ -371,7 +379,7 @@ const SCRIPTS = {
   },
 };
 
-export const CUTSCENES = { intro: 'เปิดเรื่อง: ปี 2050', nowake: 'น้องล่ามไม่ตื่น', ending: 'ตอนจบ: น้องล่ามตื่นแล้ว' };
+export const CUTSCENES = { intro: 'เปิดเรื่อง: ปี 2050', nowake: 'น้องล่ามไม่ตื่น', timeskip: 'สามเดือนต่อมา', ending: 'ตอนจบ: น้องล่ามตื่นแล้ว' };
 
 // Play one scene; resolves when it ends or is skipped. The game keeps working if anything here fails.
 export async function playCutscene(name) {
@@ -387,6 +395,7 @@ export async function playCutscene(name) {
   renderer.setAnimationLoop(tick);
   try { await SCRIPTS[name](); }
   catch (e) { if (!(e instanceof Skip)) console.warn('cutscene', name, e); }
+  stopVoice();
   el.classList.add('out');
   await sleep(500);
   renderer.setAnimationLoop(null);
