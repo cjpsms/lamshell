@@ -11,7 +11,8 @@ const MODELS = {
 const IMAGES = {};   // 2D fallback per character, if a model is ever missing
 const MOODS = ['happy', 'angry', 'sad', 'surprised', 'relaxed'];
 // Bones any animation may touch (stage idle or cutscenes); restPose() zeroes them.
-export const POSED = ['hips', 'spine', 'chest', 'neck', 'head', 'leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'leftHand', 'rightHand'];
+export const POSED = ['hips', 'spine', 'chest', 'neck', 'head', 'leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'leftHand', 'rightHand',
+  'leftUpperLeg', 'rightUpperLeg', 'leftLowerLeg', 'rightLowerLeg'];
 export const IDLE_FACE = { lam: { happy: 0.45 } };   // expression weights while standing idle
 
 let box, canvas, img, nameEl, renderer, scene, camera, clock;

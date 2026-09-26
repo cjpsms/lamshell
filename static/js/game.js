@@ -18,6 +18,15 @@ const SAVE_KEY = 'lamshell.progress.v1';
 let progress = { unlocked: 0, stars: {}, cards: [], seen: {} };
 try { Object.assign(progress, JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); } catch {}
 progress.seen ||= {};
+// Progress used to be a bare level index, which shifts whenever levels are added. Phase 2 grew from 8 to 9
+// levels (2-9 is new), so an old save that reached phase 3 moves one slot on. From now on the furthest level is
+// also kept by id and wins over the index.
+if (!progress.unlockedId && progress.unlocked >= 17) progress.unlocked += 1;
+if (progress.unlockedId) {
+  const i = LEVELS.findIndex(l => l.id === progress.unlockedId);
+  if (i >= 0) progress.unlocked = i;
+}
+progress.unlockedId = LEVELS[Math.min(progress.unlocked, LEVELS.length - 1)].id;
 const save = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch {} };
 
 // ---------- terminal ----------
@@ -158,7 +167,7 @@ function setPrompt() {
     if (L) $('#tabtitle').textContent = `${HOST}: ${L.sh.pretty()}`;
     input.type = 'text';
   }
-  input.placeholder = pending ? '' : L && L.lv.phase === 1 ? 'พิมพ์ภาษาไทยได้เลย…' : L && L.lv.phase === 2 ? 'ภาษาอังกฤษง่ายๆ…' : '';
+  input.placeholder = pending ? '' : L && L.lv.phase === 1 ? 'พิมพ์ภาษาไทยได้เลย…' : L && L.lv.phase === 2 ? 'ถามเป็นภาษาไทย หรือพิมพ์คำสั่งเอง…' : '';
 }
 
 input.addEventListener('keydown', e => {
@@ -259,26 +268,11 @@ async function handle(text) {
     return translateAndRun(text);
   }
 
+  // Phase 2 (ห้องเรียนน้องล่าม): a real command runs; anything else gets taught, never run for you.
   if (phase === 2) {
-    if (hasThai(text)) {
-      if (kedmaneeHint(text)) return;
-      say('lam', 'ง่ำๆ...ฟังไม่ออก T_T ภาษาไทยโดนไวรัสกัดไปแล้ว ลองภาษาอังกฤษนะ');
-      return;
-    }
-    if (realFirst) { L.typedReal = true; return runAndHelp(text); }
-    await run(text);                                  // real bash: command not found [127]
-    const r = await think(text);
-    if (!r.command) { say('lam', r.reply || 'น้องล่ามก็ไม่รู้ว่าหมายถึงอะไร'); return; }
-    L.aiUsed++;
-    const name = r.command.split(/\s+/)[0] === 'sudo' ? r.command.split(/\s+/).slice(0, 2).join(' ') : r.command.split(/\s+/)[0];
-    const card = `<div class="card-map"><span>${esc(first)}</span> → <b>${esc(name)}</b></div>`;
-    if (L.lv.mode === 'run') {
-      note(`<span class="tag">น้องล่ามช่วย</span>คุณหมายถึง <code>${esc(name)}</code> ใช่ไหม? เรารันให้ก่อนนะ ${card}`, 'trans');
-      showTranslation(r);
-      return run(r.command, true);
-    }
-    note(`<span class="tag">น้องล่ามช่วย</span>หมายถึง <code>${esc(name)}</code> ใช่ไหม? พิมพ์เองนะ ${card}`, 'trans');
-    return;
+    if (realFirst && !hasThai(text)) { L.typedReal = true; return runAndHelp(text); }
+    if (hasThai(text) && kedmaneeHint(text)) return;
+    return teach(text);
   }
 
   if (phase === 3) {
@@ -342,6 +336,24 @@ function showTranslation(r) {
       (r.explain ? `<div class="explain">${esc(r.explain)}</div>` : ''), 'trans');
 }
 
+// The lesson: the command, what every part of it means, then "type it yourself".
+function lessonCard(r, tag = 'น้องล่ามสอน') {
+  const parts = (r.parts || []).filter(p => p.token && p.meaning)
+    .map(p => `<li><code>${esc(p.token)}</code> = ${esc(p.meaning)}</li>`).join('');
+  note(`<span class="tag">${esc(tag)}</span><code class="cmdt big">${esc(r.command)}</code>` +
+       (parts ? `<ul class="lesson">${parts}</ul>` : '') +
+       (r.explain ? `<div class="explain">${esc(r.explain)}</div>` : ''), 'trans');
+}
+
+async function teach(text) {
+  const r = await think(text);
+  if (!r.command) { say('lam', r.reply || 'เรายังไม่เข้าใจ ลองบอกอีกแบบนะ'); return; }
+  L.aiUsed++;
+  L.lastTaught = r.command;
+  lessonCard(r);
+  say('lam', `ลองพิมพ์ ${r.command} เองดูสิ`);
+}
+
 async function translateAndRun(text) {
   const r = await think(text);
   if (!r.command) { say('lam', r.reply || 'น้องล่ามยังไม่เข้าใจ ลองพูดอีกแบบนะ'); return; }
@@ -389,7 +401,7 @@ async function runAndHelp(text) {
   }
   note(`<span class="tag">น้องล่ามช่วยแก้</span><code class="cmdt">${esc(r.command)}</code>` +
       (r.explain ? `<div class="explain">${esc(r.explain)}</div>` : ''), 'trans');
-  if (phase === 2 && L.lv.mode === 'suggest') { say('lam', 'ลองแก้แล้วพิมพ์เองนะ'); return res; }
+  if (phase === 2) { say('lam', 'ลองแก้แล้วพิมพ์ใหม่เองนะ'); return res; }
   if (!(await ask('lam', 'ให้เรารันแบบที่แก้แล้วไหม?'))) { say('lam', 'โอเค ลองแก้เองนะ สู้ๆ!'); return res; }
   L.aiUsed++;
   L.typedReal = false;
@@ -403,6 +415,7 @@ async function run(line, translated = false) {
   const before = new Set(L.fs.allPaths());
   const res = await L.sh.exec(line);
   res.created = L.fs.allPaths().filter(p => !before.has(p));
+  res.cwd = L.sh.cwd;
   res.translated = translated;
   L.hist.push(res);
   L.attempts++;
@@ -599,6 +612,7 @@ async function pass() {
   const id = L.lv.id;
   progress.stars[id] = Math.max(progress.stars[id] || 0, L.stars);
   progress.unlocked = Math.max(progress.unlocked, Math.min(L.idx + 1, LEVELS.length - 1));
+  progress.unlockedId = LEVELS[progress.unlocked].id;
   for (const c of L.lv.cards || []) if (!progress.cards.includes(c)) progress.cards.push(c);
   save();
   for (const [who, t] of L.lv.outro || []) { await sleep(200); say(who, t); }
@@ -720,7 +734,7 @@ $('#hint').onclick = useHint;
 $('#reset').onclick = () => L && loadLevel(L.idx, { replay: true });
 $('#wipe').onclick = () => {
   if (!confirm('ล้างความคืบหน้าทั้งหมด (ดาว/การ์ด) ใช่ไหม?')) return;
-  progress = { unlocked: 0, stars: {}, cards: [] };
+  progress = { unlocked: 0, unlockedId: LEVELS[0].id, stars: {}, cards: [], seen: {} };
   save();
   loadLevel(0);
 };

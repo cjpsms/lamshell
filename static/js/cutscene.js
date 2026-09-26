@@ -9,15 +9,18 @@ const MOODS = ['happy', 'angry', 'sad', 'surprised', 'relaxed'];
 const REST = { leftUpperArm: [0, 0, -1.25], rightUpperArm: [0, 0, 1.25], leftLowerArm: [0, 0, -0.1], rightLowerArm: [0, 0, 0.1] };
 
 const sin = Math.sin, abs = Math.abs;
+export const WAVE = { uy: 0.35, uz: 0.2, lz: -1.75, twist: 0, hand: -1.2 };   // exported so the pose can be tuned live
 const ease = (a, b, k) => a + (b - a) * k;
 
 // Each pose returns target rotations per bone ([x, y, z]), an optional body lift (metres), face weights,
 // and whether the eyes are shut. t = seconds since the pose started. Anything not returned goes to rest.
 const POSES = {
   idle: t => ({ chest: [sin(t * 1.7) * 0.015, 0, 0], neck: [0, sin(t * 0.45) * 0.06, 0], head: [0, 0, sin(t * 0.7) * 0.03] }),
+  // Elbow out at about shoulder height, forearm up, palm to the camera, waving from the elbow.
   wave: t => ({
-    rightUpperArm: [0, 0, 0.45], rightLowerArm: [0, 0, -1.9 + sin(t * 9) * 0.3],
-    head: [0, 0, 0.08], chest: [sin(t * 1.7) * 0.015, 0, 0], face: { happy: 0.6 },
+    rightUpperArm: [0, WAVE.uy, WAVE.uz], rightLowerArm: [WAVE.twist, 0, WAVE.lz + sin(t * 8) * 0.32],
+    rightHand: [WAVE.hand, 0, sin(t * 8 + 0.6) * 0.15],
+    head: [0, 0, 0.1], chest: [sin(t * 1.7) * 0.015, 0, -0.05], spine: [0, 0, -0.03], face: { happy: 0.6 },
   }),
   point: t => ({ rightUpperArm: [0, 1.35, 0.15], rightLowerArm: [0, 0, 0], head: [0.05, 0, 0], chest: [sin(t * 1.7) * 0.015, 0, 0] }),
   cheer: t => ({
@@ -53,7 +56,8 @@ const POSES = {
   laugh: t => ({ head: [-0.2 + abs(sin(t * 10)) * 0.08, 0, 0], chest: [-0.05, 0, 0], leftUpperArm: [0, 0, -0.9], rightUpperArm: [0, 0, 0.9], face: { happy: 1 } }),
 };
 
-const CAM_Z = 4.4;   // far enough that the tallest character (พี่รูท) fits head to toe
+const CAM_Z = 4.4;
+let baseZ = CAM_Z;   // far enough that the tallest character (พี่รูท) fits head to toe
 let el, canvas, renderer, scene, camera, clock;
 const actors = new Map();   // who -> actor
 let skipped = false, advance = null;
@@ -103,7 +107,7 @@ function resize() {
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   // Keep everyone in frame on narrow screens by backing the camera off.
-  camera.position.z = w / h < 1.2 ? CAM_Z * (1.2 / (w / h)) : CAM_Z;
+  baseZ = w / h < 1.2 ? CAM_Z * (1.2 / (w / h)) : CAM_Z;
   camera.updateProjectionMatrix();
 }
 
@@ -111,12 +115,16 @@ function tick() {
   const dt = Math.min(clock.getDelta(), 0.1), now = performance.now();
   for (const a of actors.values()) {
     const v = a.vrm, t = (now - a.poseAt) / 1000;
-    const P = (POSES[a.pose] || POSES.idle)(t, a);
-    const moving = abs(a.x - a.tx) > 0.02;
-    a.x = ease(a.x, a.tx, a.speed);
+    const P = { ...(POSES[a.pose] || POSES.idle)(t, a) };
+    const moving = abs(a.x - a.tx) > 0.03;
+    const step = Math.sign(a.tx - a.x);
+    a.x += Math.max(-a.stride, Math.min(a.stride, (a.tx - a.x) * a.speed * 3));   // walk at a steady pace
+    if (moving) Object.assign(P, walk(now / 1000));
+    else if (now < a.talkUntil && (a.pose === 'idle' || a.pose === 'nod')) Object.assign(P, gesture(now / 1000, P));
     v.scene.position.x = a.x + (P.jitterX || 0);
-    v.scene.position.y = ease(v.scene.position.y, (P.lift || 0) + (moving ? abs(sin(now / 90)) * 0.03 : 0), 0.3);
-    v.scene.rotation.y = ease(v.scene.rotation.y, a.ry, 0.1);
+    v.scene.position.y = ease(v.scene.position.y, (P.lift || 0), 0.3);
+    // Turn toward where we're walking; face the scene again when we stop.
+    v.scene.rotation.y = ease(v.scene.rotation.y, moving ? step * 1.1 : a.ry, 0.12);
     for (const name of POSED) {
       const n = v.humanoid.getNormalizedBoneNode(name);
       if (!n) continue;
@@ -138,7 +146,38 @@ function tick() {
     }
     v.update(dt);
   }
+  fitCamera();
   renderer.render(scene, camera);
+}
+
+// A walking step cycle: legs alternate, knees bend on the back swing, arms swing opposite, a little bounce.
+function walk(t) {
+  const ph = t * 9;
+  return {
+    leftUpperLeg: [-sin(ph) * 0.45, 0, 0], rightUpperLeg: [sin(ph) * 0.45, 0, 0],
+    leftLowerLeg: [Math.max(0, sin(ph)) * 0.7, 0, 0], rightLowerLeg: [Math.max(0, -sin(ph)) * 0.7, 0, 0],
+    leftUpperArm: [sin(ph) * 0.35, 0, -1.2], rightUpperArm: [-sin(ph) * 0.35, 0, 1.2],
+    leftLowerArm: [0, -0.25, 0], rightLowerArm: [0, 0.25, 0],
+    chest: [0.04, 0, 0], lift: abs(sin(ph)) * 0.025,
+  };
+}
+
+// Small hand movement while talking, so nobody delivers a line like a statue.
+function gesture(t, P) {
+  return {
+    leftUpperArm: [0, 0, -1.12 + sin(t * 2.3) * 0.06], rightUpperArm: [0, 0, 1.12 + sin(t * 2.9 + 1) * 0.06],
+    leftLowerArm: [0, -0.5 - sin(t * 3.1) * 0.25, 0], rightLowerArm: [0, 0.45 + sin(t * 2.6 + 2) * 0.25, 0],
+    chest: [(P.chest?.[0] || 0) + 0.01, sin(t * 1.3) * 0.04, 0],
+  };
+}
+
+// Back the camera off until everyone who's in the scene (not walking out) fits, with a margin.
+function fitCamera() {
+  const half = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
+  let need = 0;
+  for (const a of actors.values()) if (abs(a.tx) < 2.4) need = Math.max(need, abs(a.x) + 0.55);
+  const z = Math.max(baseZ, need / half);
+  camera.position.z = ease(camera.position.z, z, 0.05);
 }
 
 // ---------- script API ----------
@@ -180,7 +219,7 @@ const S = {
     restPose(vrm);
     scene.add(vrm.scene);
     const start = from === 'left' ? -2.6 : from === 'right' ? 2.6 : x;
-    const a = { who, vrm, x: start, tx: x, speed: from ? 0.05 : 1, ry, pose, poseAt: performance.now(), face, talkUntil: 0 };
+    const a = { who, vrm, x: start, tx: x, speed: from ? 0.05 : 1, stride: from ? 0.028 : 99, ry, pose, poseAt: performance.now(), face, talkUntil: 0 };
     vrm.scene.position.set(start, 0, 0);
     vrm.scene.rotation.y = ry;
     actors.set(who, a);
@@ -189,9 +228,10 @@ const S = {
   exit(who, to = 'right') {
     const a = actors.get(who);
     if (!a) return;
-    a.tx = to === 'left' ? -2.8 : 2.8;
+    a.tx = to === 'left' ? -3.2 : 3.2;
     a.speed = 0.06;
-    setTimeout(() => { if (actors.get(who) === a && abs(a.x) > 2.4) { scene.remove(a.vrm.scene); actors.delete(who); } }, 1600);
+    a.stride = 0.03;
+    setTimeout(() => { if (actors.get(who) === a) { scene.remove(a.vrm.scene); actors.delete(who); } }, 4000);
   },
   vanish(who) {
     const a = actors.get(who);
@@ -206,7 +246,7 @@ const S = {
     a.poseAt = performance.now();
     if (face) a.face = face;
   },
-  move(who, x) { const a = actors.get(who); if (a) { a.tx = x; a.speed = 0.05; } },
+  move(who, x) { const a = actors.get(who); if (a) { a.tx = x; a.speed = 0.05; a.stride = 0.028; } },
   face(who, ry) { const a = actors.get(who); if (a) a.ry = ry; },
   async say(who, text, { pose, ms } = {}) {
     check();
@@ -227,7 +267,15 @@ const S = {
 };
 
 // ---------- the story ----------
+export const POSE_TEST = ['wave', 'point', 'cheer', 'shock'];
 const SCRIPTS = {
+  // Dev only: walk in, then hold each pose so it can be judged. playCutscene('_poses')
+  async _poses() {
+    S.bg('future');
+    await S.enter('lam', { x: 0, from: 'left' });
+    await S.wait(3500);
+    for (const p of POSE_TEST) { S.pose('lam', p); await S.wait(2500); }
+  },
   // Before 1-1: the world, น้องล่าม, and the virus.
   async intro() {
     S.bg('future');
