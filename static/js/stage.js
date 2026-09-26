@@ -10,6 +10,7 @@ const MODELS = {
 };
 const IMAGES = {};   // 2D fallback per character, if a model is ever missing
 const MOODS = ['happy', 'angry', 'sad', 'surprised', 'relaxed'];
+export const IDLE_FACE = { lam: { happy: 0.45 } };   // expression weights while standing idle
 
 let box, canvas, img, nameEl, renderer, scene, camera, clock;
 const cache = {};          // who -> Promise<VRM>
@@ -57,7 +58,8 @@ export function speak(who, name, text, m = 'neutral', { now = false } = {}) {
 
 // The current line's timer; calling it ends the line early.
 let cutLine = null;
-const lineWait = ms => new Promise(r => { const t = setTimeout(r, ms); cutLine = () => { clearTimeout(t); r(); }; });
+let wasCut = false;
+const lineWait = ms => new Promise(r => { const t = setTimeout(r, ms); cutLine = () => { clearTimeout(t); wasCut = true; r(); }; });
 
 async function play() {
   playing = true;
@@ -81,10 +83,11 @@ async function play() {
     box.classList.remove('swap');
     mood = m;
     talkUntil = performance.now() + dur;
+    wasCut = false;
     await lineWait(dur);
     cutLine = null;
     box.classList.remove('talking');
-    if (queue.length) await wait(PAUSE);
+    if (queue.length && !wasCut) await wait(PAUSE);   // a cut line hands over at once
   }
   playing = false;
 }
@@ -165,7 +168,12 @@ function tick() {
   const em = cur.expressionManager;
   const talking = performance.now() < talkUntil;
 
-  for (const k of MOODS) em.setValue(k, ease(em.getValue(k), k === mood ? 0.6 : 0, 0.08));
+  // Talking: the line's mood. Standing idle: น้องล่าม smiles, everyone else goes neutral.
+  const idle = !talking && IDLE_FACE[curWho];
+  for (const k of MOODS) {
+    const target = talking ? (k === mood ? 0.6 : 0) : idle && idle[k] || 0;
+    em.setValue(k, ease(em.getValue(k), target, 0.06));
+  }
   const open = talking ? 0.25 + 0.5 * Math.abs(Math.sin(t * 13)) * (0.6 + 0.4 * Math.sin(t * 3.7)) : 0;
   em.setValue('aa', ease(em.getValue('aa'), open, 0.45));
   em.setValue('oh', ease(em.getValue('oh'), talking ? 0.25 * Math.max(0, Math.sin(t * 7.3)) : 0, 0.3));
@@ -188,4 +196,4 @@ function tick() {
 }
 
 // New level: drop lines still waiting from the previous one.
-export function clearQueue() { queue.length = 0; }
+export function clearQueue() { queue.length = 0; cutLine?.(); talkUntil = 0; }
