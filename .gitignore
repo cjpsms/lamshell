@@ -9,3 +9,6 @@ tools/voices/voice_ids.json
 tools/voices/raw/
 data/
 config.json
+
+# voice-generation scripts live outside the repo (cj, 2026-09-27)
+tools/

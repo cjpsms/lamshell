@@ -1,4 +1,4 @@
-// Voiced lines. tools/voices/tts_build.py turns every fixed line into an audio file and lists it in
+// Voiced lines. Every fixed line has an audio file (made outside this repo), listed in
 // voice/manifest.json under the FNV-1a hash of "who\ntext"; here the same hash finds the file for a line.
 // Lines built at runtime (hints with file names, AI replies) have no file and stay silent.
 let manifest = {};

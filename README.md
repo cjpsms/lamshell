@@ -55,8 +55,8 @@ The whole game is one machine (`static/js/world.js`): every file the levels use 
 adds the virus's files as it goes, and what the player does carries over (delete a work file and ครูสมใจ restores it).
 น้องล่าม's memory files are written from what the player actually typed (`static/js/journal.js`).
 
-Voice acting: every fixed line is voiced (ElevenLabs, `static/voice/`, built by `tools/voices/`), except ป้าเซิร์ฟ,
-who uses a Gemini voice.
+Voice acting: every fixed line is voiced (ElevenLabs, `static/voice/`), except ป้าเซิร์ฟ, who uses a Gemini voice.
+The generation scripts are not part of this repo.
 
 ## Classroom
 
@@ -81,4 +81,4 @@ who uses a Gemini voice.
 
 ## Not done yet
 
-Voices for ป้าเซิร์ฟ (Gemini TTS, `tools/voices/tts_build.py --who serv`), the v86 "real Linux" ending.
+The v86 "real Linux" ending.
