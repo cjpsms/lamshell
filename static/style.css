@@ -315,5 +315,7 @@ mark { background: #4a3a14; color: var(--c-yellow); padding: 0 2px; }
 .ln.qz-ok { color: var(--c-green); }
 .ln.qz-no { color: var(--c-red); }
 .lvbtn.cp { border-style: dashed; color: var(--c-cyan); }
+.gui { margin-top: 8px; padding: 6px 10px; border-radius: 4px; background: #16202b; color: #9fc6e6; font-size: 13px; line-height: 1.5; }
+.gui[hidden] { display: none; }
 .who-serv .who { color: var(--c-cyan); }
 .cast-name.who-serv { color: var(--c-cyan); }

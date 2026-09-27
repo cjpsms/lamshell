@@ -2,7 +2,7 @@ import { sizeOf } from './vfs.js';
 import { Shell } from './shell.js';
 import { decode } from './decoder.js';
 import { interpret, aiStatus, hasThai, fromKedmanee } from './translate.js';
-import { LEVELS, PHASES, STRICT, PHASE_ORDER, phaseLabel } from './levels.js';
+import { LEVELS, PHASES, STRICT, PHASE_ORDER, GUI, phaseLabel } from './levels.js';
 import { isMuted, setMuted } from './voice.js';
 import { worldFor, saveWorld, levelStart, forgetWorld, keptFiles, restoreKept } from './world.js';
 import { logInput, clearJournal } from './journal.js';
@@ -309,6 +309,7 @@ async function openQuiz(cp, idx) {
   $('#lvphase').textContent = `ก่อนเข้า ${phaseLabel(LEVELS[idx].phase)} · ${PHASES[LEVELS[idx].phase].name}`;
   $('#mission').textContent = 'ตอบคำถาม 5 ข้อในเทอร์มินัล (พิมพ์เลข 1-4) ถูกอย่างน้อย 4 ข้อ (80%) เพื่อเปิดโซนถัดไป';
   $('#steps').innerHTML = '';
+  $('#gui').hidden = true;
   const q0 = progress.quiz[cp];
   $('#lvstars').textContent = q0 ? `สถิติ ${q0.best}/5` : '';
   $('#hint').disabled = true;
@@ -801,6 +802,8 @@ function renderSide() {
   $('#lvtitle').textContent = lv.title;
   $('#lvphase').textContent = `${phaseLabel(lv.phase)} · ${PHASES[lv.phase].name}`;
   $('#mission').textContent = lv.mission;
+  $('#gui').hidden = !GUI[lv.id];
+  $('#gui').textContent = GUI[lv.id] ? '🖱️ เทียบกับ Windows: ' + GUI[lv.id] : '';
   renderSteps();
   const best = progress.stars[lv.id] || 0;
   $('#lvstars').textContent = L.passed ? starStr(L.stars) : best ? `สถิติ ${starStr(best)}` : '☆☆☆';

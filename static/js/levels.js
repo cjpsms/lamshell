@@ -43,6 +43,28 @@ export const STRICT = new Set([4, 'B', 'R', 5]);
 export const PHASE_ORDER = [1, 2, 3, 4, 'B', 'R', 5];
 export const phaseLabel = ph => ph === 'B' ? 'ด่านสะพาน' : ph === 'R' ? 'ภารกิจกู้ภัย' : ph === 5 ? 'บทสุดท้าย' : 'เฟส ' + ph;
 
+// One sentence per new idea comparing it to what students already do with a mouse on Windows (text in the side
+// panel, never spoken, so it needs no voice). Mostly for the bridge and rescue levels, where nobody translates.
+export const GUI = {
+  '1-2': 'cd = ดับเบิลคลิกเข้าโฟลเดอร์',
+  '1-7': '*grade* = พิมพ์ grade ในช่องค้นหาของ File Explorer',
+  '1-8': 'sudo = คลิกขวาแล้วเลือก "Run as administrator"',
+  '1-9': 'rm = กด Shift+Delete ลบถาวร ไม่ผ่านถังขยะ',
+  '2-4': 'lab/notes/day1.txt = ที่อยู่ในแถบบนของ File Explorer (lab > notes > day1.txt)',
+  '2-5': '/home/student/... = ที่อยู่เต็มแบบ C:\\Users\\student\\... ใช้ได้จากทุกที่',
+  '3-1': 'ls -a = ติ๊ก "Hidden items" (แสดงไฟล์ที่ซ่อน) ใน File Explorer',
+  '4-7': '--help = กด F1 หรือเปิดเมนู Help ของโปรแกรม',
+  B1: '| = สายพานในโรงงาน ผลของคำสั่งซ้ายส่งต่อให้คำสั่งขวาทำต่อ',
+  B2: 'grep = ช่องกรอง เหลือแค่บรรทัดที่มีคำที่ต้องการ',
+  B3: '2>/dev/null = โยนคำบ่น (error) ลงถังขยะ จอจะเหลือแต่ผลลัพธ์',
+  B4: '> = Save As ลงไฟล์ (ทับของเดิม) ส่วน >> = เขียนต่อท้าย',
+  B5: 'xargs rm = เลือกทุกไฟล์ในรายชื่อแล้วกด Delete ทีเดียว',
+  R1: 'find / = ค้นหาทั้ง This PC ไม่ใช่แค่โฟลเดอร์เดียว',
+  R2: '-print ก่อน -delete = ค้นหาใน Explorer ดูผลให้ครบ แล้วค่อยเลือกทั้งหมดกดลบ',
+  R3: 'sudo mv = ตัด (Ctrl+X) แล้ววาง (Ctrl+V) ในฐานะ admin',
+  R4: './wake.sh = ดับเบิลคลิกเปิดโปรแกรมที่อยู่ในโฟลเดอร์นี้',
+};
+
 export const LEVELS = [
   // ================= PHASE 1 =================
   {
