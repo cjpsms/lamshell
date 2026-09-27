@@ -7,7 +7,7 @@
 // "ย้อนเวลา" (reset) goes back to how the machine was when the level started.
 import { VFS, baseFS } from './vfs.js';
 import { Shell } from './shell.js';
-import { LEVELS, initialWorld } from './levels.js';
+import { LEVELS, initialWorld, syncBrain } from './levels.js';
 import { key } from './account.js';
 
 const STORE = key('lamshell.world.v1');
@@ -41,6 +41,7 @@ function prepare(fs, lv) {
   lv.needs?.(fs);
   fs.mkdirp(lv.cwd);
   if (lv.target) fs.mkdirp(lv.target);
+  syncBrain(fs, lv);   // น้องล่าม's memories so far
 }
 
 // The machine as the story has it when level idx starts.

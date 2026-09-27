@@ -176,6 +176,7 @@ export const LEVELS = [
   // explained, then type it yourself. One idea per level, everything phase 3 relies on.
   {
     id: '2-1', phase: 2, title: 'เปิดไฟดูห้อง', place: 'เช้าวันที่สอง — ตึกเรียน', cwd: S,
+    arrive: fs => bite(fs, 'วันที่สอง: ไวรัสกัดมือ — สั่งเครื่องแทนเพื่อนไม่ได้แล้ว แต่ยังสอนได้'),
     intro: [
       ['virus', 'ข้ากัดมือล่ามไปแล้ว! ต่อไปนี้มันสั่งเครื่องแทนเจ้าไม่ได้อีก 👾'],
       ['lam', 'แง... เรากดคำสั่งเองไม่ได้แล้ว แต่ยังสอนได้นะ! บอกเป็นภาษาไทยว่าอยากทำอะไร เราจะบอกคำสั่งพร้อมอธิบายทุกส่วน แล้วเธอพิมพ์เอง'],
@@ -299,7 +300,7 @@ export const LEVELS = [
   // ================= PHASE 3 =================
   {
     id: '3-1', phase: 3, title: 'รังลับหลังเวที', place: 'ห้องเก็บของหลังเวที', cwd: S + '/stage',
-    arrive: fs => fs.tree(S + '/stage/.virus_nest', { 'egg.mua': '👾' }),
+    arrive: fs => { fs.tree(S + '/stage/.virus_nest', { 'egg.mua': '👾' }); bite(fs, 'ไวรัสกัดเสียง — แปลได้แค่ไส้ในของคำสั่ง'); },
     intro: [['lam', '(เสียงแหบ) เราแปลได้แค่ "ไส้ใน" แล้วนะ ชื่อคำสั่งต้องพิมพ์เองเท่านั้น'], ['lam', 'ไวรัสซ่อนรังไว้ในห้องนี้ ลองดูไฟล์ที่ซ่อนอยู่สิ']],
     mission: 'ดูรายชื่อไฟล์ รวมไฟล์ที่ซ่อนอยู่ด้วย',
     steps: [['ดูไฟล์ในห้อง', g => ranOk(g, 'ls')], ['เห็นไฟล์ที่ซ่อนอยู่ด้วย', g => sawOut(g, '.virus_nest')]],
@@ -385,6 +386,7 @@ export const LEVELS = [
   // ================= PHASE 4 =================
   {
     id: '4-1', phase: 4, title: 'สะกดผิดนิดเดียว', place: 'คืนก่อนสอบ — ห้องคอมปิดไฟ', cwd: S,
+    arrive: fs => bite(fs, 'คืนห้องเซิร์ฟเวอร์: ไวรัสกัดโมดูลล่าม — หลับไป (ดู last_log.dat)'),
     intro: [
       ['root', 'น้องล่ามหลับไปฟื้นพลังแล้ว เหลือแต่สมุดถอดรหัสทิ้งไว้ (ปุ่ม 📖 ใต้ error)'],
       ['root', 'จากนี้ไม่มีใครแปลให้ พิมพ์ผิดก็จะเห็นแบบที่คนใช้ Linux จริงเห็น ตัวเลขใน [ ] คือ exit code: 0 = สำเร็จ'],
@@ -685,6 +687,7 @@ export function initialWorld(fs) {
     'song.mp3': { content: 'mp3', size: 5_242_880 },
     'homework.pdf': { content: 'pdf', size: 2_097_152 },
   });
+  lamHome(fs);
   markKeep(fs);
 }
 
@@ -729,13 +732,13 @@ function thought(e) {
   if (THAI.test(e.said)) return 'ยังพิมพ์ไทยอยู่เลย น่ารักดี เราแปลให้เอง';
   return 'พิมพ์คำสั่งจริงเองได้แล้ว! ภูมิใจจัง';
 }
-function memories() {
+function memories(all = false) {
   const j = journal();
   const first = j[0];
   const thai = [...new Map(j.filter(e => THAI.test(e.said) && e.ran && e.ran !== e.said).map(e => [e.said, e])).values()].slice(0, 8);
   const typed = j.length, oops = j.filter(e => e.code && e.code !== 0).length;
   const night = j.filter(e => e.lv === '3-8').slice(-8);
-  return {
+  const m = {
     'memory_first_day.dat': first
       ? `บันทึกความทรงจำ #1 — วันแรก\nเช้านั้นเครื่องเงียบมาก แล้วจู่ๆ ก็มีคนพิมพ์มาหาเรา เป็นคนแรกเลย!\nเธอพิมพ์ว่า: "${first.said}"\n` +
         (first.ran && first.ran !== first.said ? `เราแปลให้เป็น: ${first.ran}\n` : '') +
@@ -753,6 +756,13 @@ function memories() {
         : 'เธอพาเราเข้าห้องเซิร์ฟเวอร์ อ่าน log ลบไวรัส แล้วปิดเครื่อง') +
       '\n[!] ไวรัสกัดโมดูลล่าม — ล่ามกำลังหลับ\nความคิดสุดท้ายก่อนหลับ: ไม่ต้องห่วงนะ เธอเก่งพอจะสู้ต่อคนเดียวแล้ว ฝากสมุดไว้ด้วย แล้วมาปลุกเรานะ',
   };
+  if (all) return m;
+  // Before the rescue arc only what has really happened is in her brain: memories grow as the player plays.
+  if (!first) delete m['memory_first_day.dat'];
+  if (!thai.length) delete m['memory_thai_words.dat'];
+  if (!night.length) delete m['last_log.dat'];
+  if (!typed) m['memory_friends.dat'] = 'เพื่อนของเรา\nครูสมใจ: ใจดี แต่ชอบลืมว่าไฟล์เกรดอยู่ไหน\nพี่รูท: พูดน้อย แต่มาช่วยทุกครั้ง\nลุงเอก: ชอบบอกคำใบ้\n(ยังไม่มีใครเปิด terminal มาคุยกับเราเลย รออยู่นะ)';
+  return m;
 }
 const MEMORY_NAMES = ['memory_first_day.dat', 'memory_thai_words.dat', 'memory_friends.dat', 'favorite_block_game.dat', 'last_log.dat'];
 
@@ -761,21 +771,52 @@ const MEMORIES = MEMORY_NAMES.map(n => `${HOME}/${LAM}/brain/${n}`);
 const BLOCKS = BLOCK_NAMES.map(n => `${HOME}/${LAM}/brain/${n}`);
 const lamIntact = (fs, base) => fs.isFile(base + '/wake.sh') && MEMORY_NAMES.every(n => fs.isFile(brain(base) + '/' + n));
 
-function quarantine(fs) {
-  const lam = {
+// ---- น้องล่าม lives on this machine from the very first level: /opt/nong_lam (root's, readable, not writable).
+// Her brain/ grows from what this player really types (journal.js), the virus's bites go into damage.log, and at R1
+// the virus MOVES this same folder into /quarantine and jams her brain with .block files.
+const LAM_HOME = '/opt/' + LAM;
+const LAM_PLACES = [LAM_HOME, `${Q}/${LAM}`, `${HOME}/${LAM}`];
+const lamBase = fs => LAM_PLACES.find(p => fs.isDir(p)) || null;
+function lamHome(fs) {
+  fs.tree('/opt', { '__ro': true, [LAM + '/']: {
     '__ro': true,
     'wake.sh': { content: '#!/bin/bash\n# ปลุกน้องล่าม\ncheck brain/\nload language\nwake up', ro: true, x: true, prog: 'wake' },
-    'brain/': { '__ro': true },
-  };
-  for (const [n, text] of Object.entries(memories())) lam['brain/'][n] = { content: text, ro: true };
-  for (const n of BLOCK_NAMES) lam['brain/'][n] = { content: '👾 block', ro: true };
-  const q = { '__ro': true, 'README.txt': { content: 'ห้องกักกัน — ไวรัสมั่วซั่ว', ro: true }, 'gate/': { '__ro': true }, [LAM + '/']: lam };
+    'brain/': { '__ro': true, 'damage.log': { content: 'บันทึกความเสียหายของน้องล่าม\n(ยังไม่มี สุขภาพดี 100%)', ro: true } },
+  } });
+}
+// Write the memories that exist by now into her brain, wherever she is. world.js calls it at every level start.
+export function syncBrain(fs, lv) {
+  const all = LEVELS.indexOf(lv) >= LEVELS.findIndex(l => l.id === 'R1');
+  if (!lamBase(fs) && !all) lamHome(fs);   // a machine saved before she lived in /opt
+  const base = lamBase(fs);
+  if (!base) return;
+  for (const [n, text] of Object.entries(memories(all))) fs.write(brain(base) + '/' + n, text, { ro: true });
+}
+// The virus's attacks, as น้องล่าม's own damage report.
+function bite(fs, line) {
+  const base = lamBase(fs);
+  if (!base) return;
+  const f = fs.get(brain(base) + '/damage.log');
+  const old = f && f.t === 'f' ? f.content.replace(/\n\(ยังไม่มี สุขภาพดี 100%\)\n?$/, '\n') : 'บันทึกความเสียหายของน้องล่าม\n';
+  if (old.includes(line)) return;
+  fs.write(brain(base) + '/damage.log', old.replace(/\n*$/, '\n') + line, { ro: true });
+}
+
+function quarantine(fs) {
+  if (!lamBase(fs)) lamHome(fs);   // someone removed her with sudo before the rescue arc: she is put back to be taken
+  const q = { '__ro': true, 'README.txt': { content: 'ห้องกักกัน — ไวรัสมั่วซั่ว', ro: true }, 'gate/': { '__ro': true } };
   for (const p of TRAPS) {
     const rel = p.slice(Q.length + 1);
     if (rel.startsWith('gate/')) q['gate/'][rel.slice(5)] = { content: '💣', ro: true };
     else q[rel] = { content: '💣', ro: true };
   }
   fs.tree(Q, q);
+  const from = lamBase(fs);
+  if (from !== `${Q}/${LAM}`) rename(fs, from, `${Q}/${LAM}`);   // the same folder the player could see in /opt
+  const base = `${Q}/${LAM}`;
+  for (const [n, text] of Object.entries(memories(true))) fs.write(brain(base) + '/' + n, text, { ro: true });
+  for (const n of BLOCK_NAMES) fs.write(brain(base) + '/' + n, '👾 block', { ro: true });
+  bite(fs, 'ถูกลากไปขังใน /quarantine และโดนอุดสมองด้วยไฟล์ .block 5 ไฟล์');
 }
 
 // wake.sh: fails while the brain still has .block files in it (the story's "she doesn't wake up").
