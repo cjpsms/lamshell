@@ -1,7 +1,7 @@
 // Checkpoint quizzes (design doc: mastery gate). After phases 1-4, ป้าเซิร์ฟ -- the school server herself -- checks
 // the player before opening the next zone: 5 questions drawn from the phase's bank, 4/5 (80%) to pass. Questions
 // ask what a command does and what a real error means (the game's selling point). Every error line below is the
-// exact text the game's shell prints.
+// exact text the game's shell prints, and every question is about something a level of that phase (or before) taught.
 const PICK = 5, PASS = 4;
 
 export const CHECKPOINTS = {
@@ -29,8 +29,6 @@ export const CHECKPOINTS = {
         x: ['พิมพ์ cat exam.txt ซ้ำจนกว่าจะเปิดได้', 'สร้างไฟล์ใหม่ชื่อ exam.txt', 'เปลี่ยนชื่อไฟล์ก่อน'], why: 'Permission denied = ไม่มีสิทธิ์ ของนี้เป็นของ root ต้องใช้ sudo' },
       { id: '1h', q: 'error นี้หมายความว่าอะไร?', code: 'Failed to power off system via logind: Interactive authentication required.', a: 'ปิดเครื่องต้องใช้สิทธิ์ผู้ดูแล ต้องพิมพ์ sudo poweroff',
         x: ['คอมพังแล้ว', 'ต้องปิดโปรแกรมอื่นให้หมดก่อน', 'สะกด poweroff ผิด'], why: 'authentication required = ต้องยืนยันว่าเป็นผู้ดูแล' },
-      { id: '1i', q: 'error นี้แปลว่าอะไร?', code: 'bash: sl: command not found', a: 'ไม่มีคำสั่งชื่อ sl (น่าจะพิมพ์ ls สลับตัว)',
-        x: ['ไม่มีไฟล์ชื่อ sl', 'ไม่มีสิทธิ์ใช้ sl', 'ห้องนี้ว่างเปล่า'], why: 'command not found = bash หาคำสั่งชื่อนี้ไม่เจอ' },
     ],
   },
   2: {
@@ -73,16 +71,12 @@ export const CHECKPOINTS = {
         x: ['แสดงเฉพาะโฟลเดอร์', 'แสดงแบบละเอียด มีขนาดไฟล์', 'เรียงตามตัวอักษร'], why: '-a = all ทั้งหมด รวมไฟล์ที่ซ่อน' },
       { id: '3b', q: 'คำสั่งนี้ทำอะไร? (ตอนนี้ยังไม่มีโฟลเดอร์ projects)', code: 'mkdir -p projects/2569/science', a: 'สร้างโฟลเดอร์ซ้อนกันครบทุกชั้นในทีเดียว',
         x: ['error เพราะยังไม่มี projects', 'สร้างแค่โฟลเดอร์ science', 'สร้างไฟล์ชื่อ science'], why: '-p = parents สร้างชั้นบนที่ยังไม่มีให้ด้วย' },
-      { id: '3c', q: 'พิมพ์ mkdir โดยไม่ใส่ -p แล้วเจอ error นี้ เพราะอะไร?', code: "mkdir: cannot create directory 'projects/2569/science': No such file or directory", a: 'ชั้นบน (projects/2569) ยังไม่มี',
-        x: ['มีโฟลเดอร์ science อยู่แล้ว', 'ไม่มีสิทธิ์สร้าง', 'ชื่อโฟลเดอร์ห้ามมีตัวเลข'], why: 'No such file or directory ตรงนี้หมายถึงทางไปยังไม่มี' },
       { id: '3d', q: 'คำสั่งนี้หาอะไร?', code: 'find . -type f -size +50M', a: 'ไฟล์ (ไม่เอาโฟลเดอร์) ที่ใหญ่กว่า 50MB',
         x: ['ไฟล์ที่เล็กกว่า 50MB', 'โฟลเดอร์ชื่อ 50M', 'ไฟล์ใหญ่แล้วลบทิ้งเลย'], why: '-type f = ไฟล์, -size +50M = ใหญ่กว่า 50 เมก' },
       { id: '3e', q: 'ก่อนลบไฟล์หลายไฟล์ ควรทำอะไรก่อน?', a: 'ดูรายชื่อที่จะโดนลบก่อน เช่น ls หรือ find แบบยังไม่ลบ',
         x: ['ลบเลย ลบผิดก็กู้คืนได้', 'ใส่ -f ให้ลบเร็วขึ้น', 'ปิดเครื่องก่อน'], why: 'rm ในเครื่องจริงไม่มีถังขยะ ลบแล้วหายเลย' },
       { id: '3f', q: 'เจอ error นี้ ต้องแก้ยังไง?', code: "rm: cannot remove 'mua.bin': Permission denied", a: 'ไฟล์เป็นของ root ต้องใช้ sudo rm mua.bin',
         x: ['ใส่ -r', 'ไฟล์ไม่มีอยู่จริง พิมพ์ชื่อใหม่', 'cd ออกไปก่อนแล้วลบ'], why: 'Permission denied = ไม่มีสิทธิ์' },
-      { id: '3g', q: 'error นี้แปลว่าอะไร?', code: "rm: cannot remove 'club': Is a directory", a: 'club เป็นโฟลเดอร์ rm เฉยๆ ลบไม่ได้',
-        x: ['ไม่มี club อยู่', 'ไม่มีสิทธิ์ลบ club', 'club เป็นไฟล์ว่าง'], why: 'Is a directory = อันนี้เป็นโฟลเดอร์นะ' },
       { id: '3h', q: 'หลงอยู่ลึกมากใน stage/costumes/hats/red อยากกลับบ้านทีเดียว พิมพ์อะไร?', a: 'cd ~',
         x: ['cd ..', 'cd /', 'ls ~'], why: '~ = บ้าน cd ~ กลับบ้านได้จากทุกที่ (cd .. ถอยแค่ชั้นเดียว)', mono: true },
     ],
@@ -105,8 +99,6 @@ export const CHECKPOINTS = {
         x: ['ไม่มีโฟลเดอร์ club/old', 'ไม่มีสิทธิ์ย้าย', 'club ว่างเปล่า'], why: 'subdirectory of itself = โฟลเดอร์ย่อยของตัวเอง (หลุมดำ)' },
       { id: '4e', q: 'บรรทัด [exit 0] หลังคำสั่ง หมายความว่าอะไร?', a: 'คำสั่งทำสำเร็จ (ถ้าไม่ใช่ 0 แปลว่ามีปัญหา)',
         x: ['คำสั่งพัง', 'ออกจากเกมแล้ว', 'ไม่มีไฟล์เลยสักไฟล์'], why: 'exit code 0 = สำเร็จ, เลขอื่น = ล้มเหลว' },
-      { id: '4f', q: 'ตัวเลือก -i ใน rm -i ทำอะไร?', a: 'ถามยืนยันก่อนลบทีละไฟล์',
-        x: ['ลบแบบไม่ถาม', 'ลบทั้งโฟลเดอร์', 'ลบเฉพาะไฟล์ที่ซ่อน'], why: '-i = interactive ถามก่อน' },
       { id: '4g', q: 'พิมพ์ cp scores.csv lab backup/ แล้วเจอ error นี้ ผลคืออะไร?', code: "cp: -r not specified; omitting directory 'lab'", a: 'scores.csv ก๊อปไปแล้ว แต่ lab ไม่ถูกก๊อป',
         x: ['ไม่มีอะไรถูกก๊อปเลย', 'ก๊อปครบทั้งสองอย่าง', 'lab ถูกลบ'], why: 'error บอกแค่ lab ที่ถูกข้าม ของอื่นทำไปแล้ว อ่านให้ครบว่าบ่นเรื่องอะไร' },
       { id: '4h', q: 'ls -l ต่างจาก ls ยังไง?', a: 'แสดงแบบละเอียด: สิทธิ์ เจ้าของ ขนาด วันที่',
