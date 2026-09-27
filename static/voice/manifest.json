@@ -562,5 +562,77 @@
 "da836f2e": {
 "src": "voice/virus/da836f2e.mp3",
 "ms": 4000
+},
+"adf8f75b": {
+"src": "voice/serv/adf8f75b.ogg",
+"ms": 6672
+},
+"927c5958": {
+"src": "voice/serv/927c5958.ogg",
+"ms": 11904
+},
+"2abf22a1": {
+"src": "voice/serv/2abf22a1.ogg",
+"ms": 5412
+},
+"e3bded0c": {
+"src": "voice/serv/e3bded0c.ogg",
+"ms": 6074
+},
+"baf93884": {
+"src": "voice/serv/baf93884.ogg",
+"ms": 9069
+},
+"38e14721": {
+"src": "voice/serv/38e14721.ogg",
+"ms": 5168
+},
+"b399f689": {
+"src": "voice/serv/b399f689.ogg",
+"ms": 7120
+},
+"95fdf9a1": {
+"src": "voice/serv/95fdf9a1.ogg",
+"ms": 7476
+},
+"adad7a98": {
+"src": "voice/serv/adad7a98.ogg",
+"ms": 5232
+},
+"89b115e6": {
+"src": "voice/serv/89b115e6.ogg",
+"ms": 3015
+},
+"2f61ce99": {
+"src": "voice/serv/2f61ce99.ogg",
+"ms": 7966
+},
+"c5f916b0": {
+"src": "voice/serv/c5f916b0.ogg",
+"ms": 7516
+},
+"80a543c2": {
+"src": "voice/serv/80a543c2.ogg",
+"ms": 1630
+},
+"513ec733": {
+"src": "voice/serv/513ec733.ogg",
+"ms": 1666
+},
+"826b4e5e": {
+"src": "voice/serv/826b4e5e.ogg",
+"ms": 918
+},
+"2fdd21bd": {
+"src": "voice/serv/2fdd21bd.ogg",
+"ms": 3896
+},
+"508f7c04": {
+"src": "voice/serv/508f7c04.ogg",
+"ms": 4528
+},
+"d1ace3bb": {
+"src": "voice/serv/d1ace3bb.ogg",
+"ms": 7282
 }
 }
