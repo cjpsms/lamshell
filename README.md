@@ -61,7 +61,10 @@ who uses a Gemini voice.
 
 - **Sign in**: students type only their class and seat number and tick the consent box (what gets collected and
   why); no names are stored. They get a player code (e.g. `TQ-7F3K`), and the teacher matches codes to names on
-  their own list. The same class + seat on another computer continues the same save (kept on the server). A
+  their own list: on the dashboard, 📋 รายชื่อนักเรียน reads the teacher's Excel (.xlsx) or CSV class list
+  (columns ชั้น / เลขที่ / ชื่อ [/ นามสกุล], or one sheet per class) and shows names next to seat numbers. The list
+  stays in that browser only (`static/js/roster.js`, .xlsx unzipped with no library); the server never gets names.
+  The same class + seat on another computer continues the same save (kept on the server). A
   "play without saving" guest mode sends nothing.
 - **Checkpoint quizzes** (`static/js/quiz.js`): after phases 1–4, ป้าเซิร์ฟ (the school server herself) asks
   5 questions drawn from a bank (what a command does, what a real error means). 4/5 (80%) opens the next phase;

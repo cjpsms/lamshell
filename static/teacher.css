@@ -47,6 +47,16 @@ code, .mono { font-family: var(--mono); font-size: 12.5px; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
 .card .big { font-size: 28px; font-weight: 700; }
 .card .lbl { color: var(--muted); font-size: 12.5px; }
+.btn { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.btn:hover { border-color: var(--cyan); }
+.roster { margin: 12px 16px 0; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; max-width: 1100px; }
+.roster[hidden] { display: none; }
+.roster h2 { margin-top: 0; }
+.rrow { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.rrow input:not([type=file]) { background: #0e1013; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; width: 110px; margin-left: 6px; }
+.rrow a { color: var(--blue); }
+#rstatus { margin: 10px 0 0; }
+#rstatus .bad { color: var(--amber); }
 .del { background: none; border: 0; color: var(--muted); cursor: pointer; }
 .del:hover { color: var(--red); }
 .empty { color: var(--muted); padding: 20px 0; }
