@@ -2,7 +2,7 @@ import { sizeOf } from './vfs.js';
 import { Shell } from './shell.js';
 import { decode } from './decoder.js';
 import { interpret, aiStatus, hasThai, fromKedmanee } from './translate.js';
-import { LEVELS, PHASES, STRICT, PHASE_ORDER, GUI, phaseLabel, lamParts, markLamGone } from './levels.js';
+import { LEVELS, PHASES, STRICT, PHASE_ORDER, GUI, phaseLabel, lamParts, markLamGone, tagLam } from './levels.js';
 import { isMuted, setMuted } from './voice.js';
 import { worldFor, saveWorld, levelStart, forgetWorld, keptFiles, restoreKept } from './world.js';
 import { logInput, clearJournal } from './journal.js';
@@ -274,6 +274,7 @@ async function loadLevel(idx, { replay = false, reset = false } = {}) {
   try { fs = (reset && live && levelStart(lv.id)) || await worldFor(idx, live); }
   finally { if (token === loading) { building = false; input.classList.remove('busy'); } }
   if (token !== loading) return;   // another level was picked while this one was being built
+  tagLam(fs);
   const sh = new Shell(fs, io, { cwd: lv.cwd, password: lv.password || 'pass123', programs: lv.programs });
   L = { idx, lv, fs, sh, live, t0: Date.now(), kept: keptFiles(fs), hist: [], attempts: 0, aiUsed: 0, typedReal: false, hint: 0, decoderOpened: false, passed: false, shownPower: false };
   // A question left open in the previous level (sudo password, y/n) must not swallow this level's first command.
@@ -562,7 +563,7 @@ async function runAndHelp(text) {
 
 async function run(line, translated = false) {
   const before = new Set(L.fs.allPaths());
-  const lamBefore = L.live ? lamParts(L.fs) : null;
+  const lamBefore = lamParts(L.fs);   // replays count too: deleting her is game over, full stop
   const res = await L.sh.exec(line);
   res.created = L.fs.allPaths().filter(p => !before.has(p));
   res.cwd = L.sh.cwd;
@@ -579,7 +580,7 @@ async function run(line, translated = false) {
     const names = back.map(p => p.split('/').pop()).join(', ');
     say('kru', `เดี๋ยวๆ! จะลบไฟล์งานของครูทำไมจ๊ะ (${names}) ครูกู้คืนจากสำรองให้แล้วนะ แต่เครื่องจริงลบแล้วหายเลย ระวังด้วย`);
   }
-  if (lamBefore) {
+  if (lamBefore.size) {
     const now = lamParts(L.fs);
     const lost = [...lamBefore].filter(p => !now.has(p));
     if (lost.length) {

@@ -787,6 +787,14 @@ export function lamParts(fs) {
   return found;
 }
 export function markLamGone(fs) { fs.root.lamGone = true; }
+// Tag her files wherever she is (machines saved before tagging existed, or a ย้อนเวลา snapshot from then).
+export function tagLam(fs) {
+  const base = lamBase(fs);
+  if (!base) return;
+  tag(fs, base + '/wake.sh', 'wake.sh');
+  const b = fs.get(brain(base));
+  if (b && b.t === 'd') for (const n of Object.keys(b.kids)) if (n.endsWith('.dat')) tag(fs, brain(base) + '/' + n, n);
+}
 function lamHome(fs) {
   fs.tree('/opt', { '__ro': true, [LAM + '/']: {
     '__ro': true,
