@@ -131,76 +131,48 @@ const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { cons
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const pickOne = a => a[Math.floor(Math.random() * a.length)];
 
-// Runs one attempt in `box`. say(who, text) speaks on the stage. Resolves with the result.
-export function runQuiz(cp, box, say) {
+// One attempt, played in the terminal like everything else: the question is printed, the player types 1-4 at the
+// prompt. t = { print(html, cls), ask(promptText) -> Promise<string|null>, say(who, text) }.
+// Resolves with { cp, score, total, passed, answers, next: 'continue' | 'retry' | 'back' }.
+export async function runQuiz(cp, t) {
   const C = CHECKPOINTS[cp];
   const qs = shuffle(C.bank).slice(0, PICK).map(q => ({ ...q, opts: shuffle([q.a, ...q.x]) }));
   const answers = [];
-  let i = 0;
-  box.className = 'quiz show';
-  for (const [who, t] of C.intro) say(who, t);
+  t.print(`=== ${esc(C.title)} ===`, 'qz-h');
+  t.print(`ตอบ ${PICK} ข้อ พิมพ์เลข 1-4 แล้วกด Enter · ถูก ${PASS} ข้อขึ้นไปเปิดโซนถัดไป`, 'cmt');
+  for (const [who, text] of C.intro) t.say(who, text);
 
-  return new Promise(resolve => {
-    let keys = null;
-    const onKey = e => keys?.(e);
-    document.addEventListener('keydown', onKey, true);
-    const done = r => { document.removeEventListener('keydown', onKey, true); box.abort = null; resolve(r); };
-    box.abort = () => done(null);   // another level was opened meanwhile
-
-    function question() {
-      const q = qs[i];
-      box.innerHTML = `<div class="qz">
-        <div class="qz-top"><span>${esc(C.title)}</span><span>ข้อ ${i + 1}/${PICK}</span></div>
-        <div class="qz-dots">${qs.map((_, k) => `<i class="${k < answers.length ? (answers[k].ok ? 'ok' : 'no') : k === i ? 'cur' : ''}"></i>`).join('')}</div>
-        <div class="qz-q">${esc(q.q)}</div>
-        ${q.code ? `<pre class="qz-code">${esc(q.code)}</pre>` : ''}
-        <div class="qz-opts">${q.opts.map((o, k) => `<button data-k="${k}" class="${q.mono ? 'mono' : ''}"><b>${k + 1}</b><span>${esc(o)}</span></button>`).join('')}</div>
-        <div class="qz-why"></div>
-      </div>`;
-      const btns = [...box.querySelectorAll('.qz-opts button')];
-      const choose = k => {
-        if (answers.length > i) return;
-        const ok = q.opts[k] === q.a;
-        answers.push({ id: q.id, q: q.q, chosen: q.opts[k], ok });
-        btns.forEach((b, n) => {
-          b.disabled = true;
-          if (q.opts[n] === q.a) b.classList.add('right');
-          else if (n === k) b.classList.add('wrong');
-        });
-        say('serv', pickOne(ok ? REACT.right : REACT.wrong));
-        const why = box.querySelector('.qz-why');
-        why.innerHTML = `<div class="${ok ? 'ok' : 'no'}">${ok ? '✓ ถูกต้อง' : '✗ ยังไม่ใช่'}</div><div>${esc(q.why)}</div>
-          <button class="qz-next">${i + 1 < PICK ? 'ข้อต่อไป →' : 'ดูผล'}</button>`;
-        const next = why.querySelector('.qz-next');
-        next.focus();
-        next.onclick = () => { i++; i < PICK ? question() : result(); };
-        keys = e => { if (e.key === 'Enter') { e.preventDefault(); next.click(); } };
-      };
-      btns.forEach(b => { b.onclick = () => choose(+b.dataset.k); });
-      keys = e => { const k = +e.key - 1; if (k >= 0 && k < btns.length) { e.preventDefault(); choose(k); } };
+  for (let i = 0; i < qs.length; i++) {
+    const q = qs[i];
+    t.print('&nbsp;');
+    t.print(`[${i + 1}/${PICK}] ${esc(q.q)}`, 'qz-q');
+    if (q.code) for (const line of q.code.split('\n')) t.print('    ' + esc(line), q.code.includes(': ') ? 'err' : 'out');
+    q.opts.forEach((o, k) => t.print(`  ${k + 1}) ${esc(o)}`, 'out'));
+    let k;
+    for (;;) {
+      const v = await t.ask('ตอบ> ');
+      if (v === null) return { cp, score: 0, total: PICK, passed: false, answers, next: 'back', quit: true };   // Ctrl+C
+      k = parseInt(String(v).trim(), 10) - 1;
+      if (k >= 0 && k < q.opts.length) break;
+      t.print('พิมพ์เลข 1-4 เท่านั้น', 'cmt');
     }
+    const ok = q.opts[k] === q.a;
+    answers.push({ id: q.id, q: q.q, chosen: q.opts[k], ok });
+    if (ok) t.print(`✓ ถูกต้อง  <span class="a-gray">${esc(q.why)}</span>`, 'qz-ok');
+    else t.print(`✗ ยังไม่ใช่ คำตอบคือ ${q.opts.indexOf(q.a) + 1}) ${esc(q.a)}  <span class="a-gray">${esc(q.why)}</span>`, 'qz-no');
+    t.say('serv', pickOne(ok ? REACT.right : REACT.wrong));
+  }
 
-    function result() {
-      const score = answers.filter(a => a.ok).length;
-      const passed = score >= PASS;
-      const r = { cp, score, total: PICK, passed, answers };
-      for (const [who, t] of passed ? C.pass : REACT.fail.map(t => ['serv', t])) say(who, t);
-      const missed = qs.filter((q, k) => !answers[k].ok);
-      box.innerHTML = `<div class="qz">
-        <div class="qz-top"><span>${esc(C.title)}</span></div>
-        <div class="qz-score ${passed ? 'ok' : 'no'}">${score}/${PICK}</div>
-        <div class="qz-verdict">${passed ? '✅ ผ่านเช็กพอยต์ ประตูโซนถัดไปเปิดแล้ว' : `ต้องได้อย่างน้อย ${PASS} ข้อ (80%) ลองใหม่ได้ไม่จำกัด`}</div>
-        ${missed.length ? `<div class="qz-review"><div class="label">ทบทวนข้อที่พลาด</div>${missed.map(q => `<div class="rv">
-          <div>${esc(q.q)}</div>${q.code ? `<pre class="qz-code">${esc(q.code)}</pre>` : ''}
-          <div>คำตอบ: <b>${esc(q.a)}</b></div><div class="muted">${esc(q.why)}</div></div>`).join('')}</div>` : ''}
-        <div class="qz-btns">${passed ? '<button class="go">ไปต่อ →</button>' : '<button class="go">ลองใหม่ (สุ่มข้อใหม่)</button>'}
-          <button class="back linkbtn">กลับไปเล่นด่านเดิม</button></div>
-      </div>`;
-      box.querySelector('.go').focus();
-      keys = null;
-      box.querySelector('.go').onclick = () => done({ ...r, next: passed ? 'continue' : 'retry' });
-      box.querySelector('.back').onclick = () => done({ ...r, next: 'back' });
-    }
-    question();
-  });
+  const score = answers.filter(a => a.ok).length;
+  const passed = score >= PASS;
+  t.print('&nbsp;');
+  t.print(`คะแนน ${score}/${PICK}  ${passed ? '— ผ่านเช็กพอยต์ ประตูโซนถัดไปเปิดแล้ว' : `— ยังไม่ผ่าน (ต้อง ${PASS} ข้อขึ้นไป)`}`, passed ? 'qz-ok' : 'qz-no');
+  for (const [who, text] of passed ? C.pass : REACT.fail.map(x => ['serv', x])) t.say(who, text);
+  const r = { cp, score, total: PICK, passed, answers };
+  if (passed) {
+    const v = await t.ask('กด Enter เพื่อไปต่อ ');
+    return { ...r, next: v === null ? 'back' : 'continue' };
+  }
+  const v = await t.ask('ลองใหม่ไหม? ข้อจะสุ่มใหม่ (y/n) ');
+  return { ...r, next: v !== null && /^\s*(y|ใช่|$)/i.test(v) ? 'retry' : 'back' };
 }

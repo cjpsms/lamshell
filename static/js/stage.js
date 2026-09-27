@@ -8,9 +8,9 @@ import { playVoice, stopVoice } from './voice.js';
 
 const MODELS = {
   lam: 'models/lam.vrm', kru: 'models/kru.vrm', root: 'models/root.vrm', lung: 'models/lung.vrm', virus: 'models/virus.vrm',
+  serv: 'models/serv.vrm',
 };
-// 2D characters (and the fallback if a model is ever missing). ป้าเซิร์ฟ is the school server herself: no body.
-const IMAGES = { serv: 'chars/serv.svg' };
+const IMAGES = {};   // 2D fallback per character, if a model is ever missing
 const MOODS = ['happy', 'angry', 'sad', 'surprised', 'relaxed'];
 // Bones any animation may touch (stage idle or cutscenes); restPose() zeroes them.
 export const POSED = ['hips', 'spine', 'chest', 'neck', 'head', 'leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'leftHand', 'rightHand',

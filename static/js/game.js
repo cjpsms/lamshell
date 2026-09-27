@@ -251,7 +251,6 @@ function aiReq(text) {
 let loading = 0, building = false;
 async function loadLevel(idx, { replay = false, reset = false } = {}) {
   const lv = LEVELS[idx];
-  closeQuiz();
   // The next phase opens only after its checkpoint quiz (only on the way forward: finished phases stay open).
   const cp = checkpointBefore(idx);
   if (cp && !progress.quiz[cp]?.passed && idx === progress.unlocked && !replay) return openQuiz(cp, idx);
@@ -296,13 +295,6 @@ function checkpointBefore(idx) {
   return prev && lv && CHECKPOINTS[prev.phase] && prev.phase !== lv.phase ? prev.phase : null;
 }
 
-function closeQuiz() {
-  const box = $('#quiz');
-  box.abort?.();
-  box.className = 'quiz';
-  box.innerHTML = '';
-}
-
 async function openQuiz(cp, idx) {
   ++loading;
   if (pending) { pending = null; busy = false; input.classList.remove('busy'); }
@@ -315,7 +307,7 @@ async function openQuiz(cp, idx) {
   $('#lvid').textContent = 'เช็กพอยต์ ' + cp;
   $('#lvtitle').textContent = CHECKPOINTS[cp].title.replace(/^.*?: /, 'ประตูของป้าเซิร์ฟ: ');
   $('#lvphase').textContent = `ก่อนเข้า ${phaseLabel(LEVELS[idx].phase)} · ${PHASES[LEVELS[idx].phase].name}`;
-  $('#mission').textContent = 'ตอบคำถาม 5 ข้อ ถูกอย่างน้อย 4 ข้อ (80%) เพื่อเปิดโซนถัดไป กดปุ่ม 1-4 บนคีย์บอร์ดเพื่อเลือกคำตอบได้';
+  $('#mission').textContent = 'ตอบคำถาม 5 ข้อในเทอร์มินัล (พิมพ์เลข 1-4) ถูกอย่างน้อย 4 ข้อ (80%) เพื่อเปิดโซนถัดไป';
   $('#steps').innerHTML = '';
   const q0 = progress.quiz[cp];
   $('#lvstars').textContent = q0 ? `สถิติ ${q0.best}/5` : '';
@@ -324,19 +316,25 @@ async function openQuiz(cp, idx) {
   $('#reset').disabled = true;
   $('#hintnote').textContent = '';
   $('#tabtitle').textContent = 'ป้าเซิร์ฟ: เช็กพอยต์ ' + cp;
-  const box = $('#quiz');
+  const token = loading;
+  const term = {
+    print: (html, cls = 'out') => add(html, cls),
+    ask: text => io.prompt(text),
+    say: (who, text) => say(who, text),
+  };
+  io.clear();
   for (;;) {
     track('quiz_start', { phase: cp, cp });
-    const r = await runQuiz(cp, box, (who, t) => say(who, t));
-    if (!r) return;   // left for another level
+    const r = await runQuiz(cp, term);
+    if (token !== loading) return;   // another level was opened meanwhile
+    if (r.quit) return loadLevel(idx - 1);
     track('quiz', { phase: cp, cp, score: r.score, total: r.total, passed: r.passed, answers: r.answers });
     const q = progress.quiz[cp] ||= { best: 0, tries: 0, passed: false };
     q.tries++;
     q.best = Math.max(q.best, r.score);
     q.passed ||= r.passed;
     save();
-    if (r.next === 'retry') continue;
-    closeQuiz();
+    if (r.next === 'retry') { io.clear(); continue; }
     return loadLevel(r.next === 'continue' ? idx : idx - 1);
   }
 }

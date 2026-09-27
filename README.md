@@ -26,7 +26,8 @@ The selling point is **learning to read errors**: every error is the exact GNU c
   the player chose.
 - `static/js/stage.js`: the character stage. The speaker shows as a VRM model (three.js + three-vrm) that blinks,
   breathes, changes expression and moves its mouth while talking. Models in `static/models/` were made by cj in
-  VRoid Studio from VRoid sample models (VRoidPreset A-Z terms: free use, not CC0).
+  VRoid Studio from VRoid sample models (VRoidPreset A-Z terms: free use, not CC0). Each model's VRM meta
+  links to https://github.com/cjpsms.
 - `static/js/levels.js`: 44 levels (phases 1–4, bridge, rescue, last act). Each builds its own world and passes on the *state of the
   world*, not on matching the exact text typed.
 
@@ -63,8 +64,8 @@ who uses a Gemini voice.
   gets collected and why), then log in with username + password on any computer; the save follows them (kept on the
   server). Passwords are PBKDF2 hashes; a login gives the browser a token that the save and play events need.
   Forgotten password: the teacher sets a new one on the dashboard. A "play without saving" guest mode sends nothing.
-- **Checkpoint quizzes** (`static/js/quiz.js`): after phases 1–4, ป้าเซิร์ฟ (the school server herself) asks
-  5 questions drawn from a bank (what a command does, what a real error means). 4/5 (80%) opens the next phase;
+- **Checkpoint quizzes** (`static/js/quiz.js`): after phases 1–4, ป้าเซิร์ฟ (the school server herself, VRM model
+  `serv.vrm`) asks 5 questions in the terminal (type 1–4), drawn from a bank (what a command does, what a real error means). 4/5 (80%) opens the next phase;
   retries draw new questions.
 - **Teacher dashboard** at `/teacher`: progress per student with anyone stuck on one level over 5 minutes
   flagged, a stars grid (every student x every level, plus checkpoint scores), a log of everything students did
