@@ -328,7 +328,7 @@ async function openQuiz(cp, idx) {
   const q0 = progress.quiz[cp];
   $('#lvstars').textContent = q0 ? `สถิติ ${q0.best}/5` : '';
   $('#hint').disabled = true;
-  $('#hint').textContent = '💡 ไม่มีคำใบ้ในแบบทดสอบ';
+  $('#hint').textContent = '💡 ไม่มีใบ้';
   $('#reset').disabled = true;
   $('#hintnote').textContent = '';
   $('#tabtitle').textContent = 'ป้าเซิร์ฟ: เช็กพอยต์ ' + cp;
@@ -857,17 +857,19 @@ function renderSide() {
   // Windows comparison + a link to the Piki page(s) this level introduces.
   const pages = PIKI_PAGES.filter(p => p.at === lv.id);
   $('#gui').hidden = !GUI[lv.id] && !pages.length;
-  $('#gui').innerHTML = (GUI[lv.id] ? '🖱️ เทียบกับ Windows: ' + esc(GUI[lv.id]) : '') +
-    (pages.length ? `<div class="gui-pk">📘 อ่านละเอียดใน Piki: ${pages.map(p => `<a href="#" data-pk="${p.id}">${esc(p.title)}</a>`).join(' · ')}</div>` : '');
+  $('#gui').innerHTML = (GUI[lv.id] ? '🖱️ ' + esc(GUI[lv.id]) : '') +
+    (pages.length ? `${GUI[lv.id] ? ' · ' : ''}📘 ${pages.map(p => `<a href="#" data-pk="${p.id}">${esc(p.title)}</a>`).join(', ')}` : '');
+  $('#gui').title = 'เทียบกับ Windows · 📘 = อ่านละเอียดใน Piki';
   $('#gui').querySelectorAll('[data-pk]').forEach(a => { a.onclick = e => { e.preventDefault(); openPiki(a.dataset.pk); }; });
   renderSteps();
   const best = progress.stars[lv.id] || 0;
   $('#lvstars').textContent = L.passed ? starStr(L.stars) : best ? `สถิติ ${starStr(best)}` : '☆☆☆';
   const hb = $('#hint');
   hb.disabled = L.passed || L.hint >= 3;
-  hb.textContent = L.hint >= 3 ? '💡 ใช้คำใบ้ครบแล้ว' : `💡 คำใบ้ขั้นที่ ${L.hint + 1}/3`;
-  hb.title = ['ลุงภารโรง: คำสั่งที่อาจต้องใช้ (ไม่หักดาว)', 'สมุดน้องล่าม: ถอดรหัส error ล่าสุด (ดาวสูงสุด 2)', 'พี่รูท: เฉลย (ดาวสูงสุด 1)'][L.hint] || '';
-  $('#hintnote').textContent = ['ขั้น 1 ไม่หักดาว', 'ขั้น 2: ดาวสูงสุดเหลือ 2', 'ขั้น 3 (เฉลย): ดาวสูงสุดเหลือ 1', ''][L.hint];
+  // Short label; what the next hint costs goes in the tooltip (the panel was getting crowded).
+  hb.textContent = L.hint >= 3 ? '💡 ใบ้ครบแล้ว' : `💡 คำใบ้ ${L.hint + 1}/3`;
+  hb.title = ['ขั้น 1 ลุงภารโรง: คำสั่งที่อาจต้องใช้ (ไม่หักดาว)', 'ขั้น 2 สมุดน้องล่าม: ถอดรหัส error ล่าสุด (ดาวสูงสุดเหลือ 2)', 'ขั้น 3 พี่รูท: เฉลย (ดาวสูงสุดเหลือ 1)'][L.hint] || '';
+  $('#hintnote').textContent = '';
 
   // level map
   const map = $('#map');
@@ -886,7 +888,7 @@ function renderSide() {
       b.disabled = i > progress.unlocked;
       b.innerHTML = `<span>${x.id}</span><small>${s ? '★'.repeat(s) : ''}</small>`;
       b.title = x.title;
-      b.onclick = () => loadLevel(i);
+      b.onclick = () => { closeMap(); loadLevel(i); };
       row.appendChild(b);
     });
     if (CHECKPOINTS[ph]) {   // the phase's checkpoint quiz, at the end of its row
@@ -897,7 +899,7 @@ function renderSide() {
       b.disabled = next < 0 || next > progress.unlocked;
       b.innerHTML = `<span>✓${ph}</span><small>${q ? q.best + '/5' : ''}</small>`;
       b.title = CHECKPOINTS[ph].title;
-      b.onclick = () => openQuiz(ph, next);
+      b.onclick = () => { closeMap(); openQuiz(ph, next); };
       row.appendChild(b);
     }
     g.appendChild(row);
@@ -913,6 +915,11 @@ function renderSide() {
 }
 
 $('#hint').onclick = useHint;
+// "All levels" slides up over the side panel with its close button always at the top.
+function closeMap() { $('#mappanel').hidden = true; }
+$('#mapbtn').onclick = () => { $('#mappanel').hidden = false; };
+$('#mapclose').onclick = closeMap;
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#mappanel').hidden) closeMap(); });
 // Who is playing, top of the side panel.
 $('#player').innerHTML = session
   ? `👤 <b>${esc(session.name || '')}</b> @${esc(session.username || '')}<button class="linkbtn" id="signout">ออกจากระบบ</button>`

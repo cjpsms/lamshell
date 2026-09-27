@@ -41,7 +41,7 @@
       <div class="mission"><div class="label">ภารกิจ</div><div id="mission"></div><ul id="steps" class="steps"></ul><div id="gui" class="gui" hidden></div></div>
       <div class="actions">
         <button id="hint"></button>
-        <button id="reset" title="รีเซ็ตโลกของด่านนี้">ย้อนเวลา</button>
+        <button id="reset" title="ย้อนเวลา: รีเซ็ตโลกของด่านนี้กลับไปตอนเริ่มด่าน">⏪ ย้อนเวลา</button>
         <button id="pikibtn" title="เปิด Piki คู่มือคำสั่ง (หรือพิมพ์ piki ชื่อคำสั่ง)">📘 Piki</button>
       </div>
       <div id="hintnote" class="muted small"></div>
@@ -49,8 +49,10 @@
 
     <section id="feed" class="feed" aria-live="polite"></section>
 
-    <details class="more">
-      <summary>ด่านทั้งหมด · การ์ดคำสั่ง</summary>
+    <button id="mapbtn" class="mapbtn">🗺️ ด่านทั้งหมด · การ์ดคำสั่ง</button>
+    <div id="mappanel" class="mappanel" hidden>
+      <div class="mp-head"><b>🗺️ ด่านทั้งหมด · การ์ดคำสั่ง</b><button id="mapclose">✕ ปิด</button></div>
+      <div class="mp-body">
       <div id="map"></div>
       <div class="label">ดูเนื้อเรื่องอีกครั้ง</div>
       <div id="scenes" class="scenes"></div>
@@ -58,7 +60,8 @@
       <div id="cards"></div>
       <button id="wipe" class="linkbtn">ล้างความคืบหน้า</button>
       <div class="credit">ตัวละคร 3D: cj (สร้างจาก VRoid Studio sample model)</div>
-    </details>
+      </div>
+    </div>
   </aside>
 
   <div class="stage">
