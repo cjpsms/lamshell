@@ -59,24 +59,23 @@ who uses a Gemini voice.
 
 ## Classroom
 
-- **Sign in**: students type name, class and seat number and tick the consent box (what gets collected and why).
-  The teacher uploads the class list on the dashboard (📋 รายชื่อนักเรียน: Excel .xlsx or CSV with ชั้น / เลขที่ /
-  ชื่อ [/ นามสกุล], or one sheet per class; read in the browser with no library, `static/js/roster.js`). The name
-  is matched against it, name only, ignoring titles like นาย/ด.ญ. and spaces: exactly the same (no typo allowance) -> straight in
-  as that list entry; not on the list -> waits until the teacher presses ยอมรับ; no list uploaded -> everyone gets in.
-  The same name on another computer continues the same save (kept on the server). A "play without saving" guest
-  mode sends nothing.
+- **Accounts**: students sign up with name, username and password (typed twice) and tick the consent box (what
+  gets collected and why), then log in with username + password on any computer; the save follows them (kept on the
+  server). Passwords are PBKDF2 hashes; a login gives the browser a token that the save and play events need.
+  Forgotten password: the teacher sets a new one on the dashboard. A "play without saving" guest mode sends nothing.
 - **Checkpoint quizzes** (`static/js/quiz.js`): after phases 1–4, ป้าเซิร์ฟ (the school server herself) asks
   5 questions drawn from a bank (what a command does, what a real error means). 4/5 (80%) opens the next phase;
   retries draw new questions.
-- **Teacher dashboard** at `/teacher`: progress per student with anyone stuck on one
-  level over 5 minutes flagged, slowest levels, the class's most common errors, Thai น้องล่าม couldn't translate,
-  quiz results per question, research indicators (repeated-error rate, AI reliance, decoder use, look before
-  delete), and a CSV export of every event.
+- **Teacher dashboard** at `/teacher`: progress per student with anyone stuck on one level over 5 minutes
+  flagged, a stars grid (every student x every level, plus checkpoint scores), a log of everything students did
+  (what they typed, errors, passes, hints, quiz results; filter by student), slowest levels, the class's most common
+  errors, Thai น้องล่าม couldn't translate, quiz results per question, research indicators (repeated-error rate, AI
+  reliance, decoder use, look before delete), and a CSV export of every event.
 - **Settings are made in the terminal**, never on the web: the first `./lamshell` (or `python3 server.py`) asks
   for the teacher password, whether students' computers may connect over the network, and the port, and writes
   `config.json` (chmod 600, gitignored; the password only as a PBKDF2 hash). Change them later with
-  `./lamshell --setup`. `LAMSHELL_HOST` / `LAMSHELL_PORT` still override.
+  `./lamshell --setup`. `LAMSHELL_HOST` / `LAMSHELL_PORT` still override. (Setup asks for 6+ characters; a
+  shorter password can be written with `settings.save(... settings.hash_password(pw))`.)
 - Play data lives in `data/lamshell.db` (SQLite, gitignored).
 
 ## Not done yet

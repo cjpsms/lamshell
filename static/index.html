@@ -85,32 +85,34 @@
   </div>
 </main>
 <div id="signin" class="signin" hidden>
-  <form autocomplete="off" onsubmit="return false">
+  <div class="si-box">
     <div class="si-title">🐧 ล่ามเชลล์</div>
-    <div class="muted">ลงชื่อก่อนเล่น ความคืบหน้าจะถูกบันทึกไว้ เล่นต่อจากเครื่องไหนก็ได้ (ใส่ชื่อเดิม)</div>
-    <label>ชื่อ-นามสกุล<input name="name" maxlength="120" placeholder="เช่น สมชาย ใจดี"></label>
-    <div class="si-row">
-      <label>ชั้น<input name="klass" maxlength="20" placeholder="เช่น ม.4/2"></label>
-      <label>เลขที่<input name="seat" maxlength="4" inputmode="numeric" placeholder="เช่น 12"></label>
-    </div>
-    <div class="consent">
-      <b>การเก็บข้อมูล</b>
-      <p>เกมนี้เป็นส่วนหนึ่งของโครงงานวิจัย ระบบจะเก็บ ชื่อ ชั้น เลขที่ สิ่งที่พิมพ์ในเกม ข้อความ error ที่เจอ
-      คำใบ้ที่ใช้ เวลาที่ใช้ในแต่ละด่าน และคะแนนแบบทดสอบ เพื่อให้ครูดูความคืบหน้า และนำไปวิเคราะห์ผลการเรียนรู้
-      ชื่อจะถูกเทียบกับรายชื่อนักเรียนของครู ข้อมูลเก็บไว้ในเครื่องของครู/ผู้วิจัยเท่านั้น ไม่เผยแพร่
-      และขอลบได้ทุกเมื่อโดยแจ้งครู</p>
-      <label class="chk"><input type="checkbox" name="consent"> ฉันอ่านแล้วและยอมรับให้เก็บข้อมูลตามนี้</label>
-    </div>
-    <div class="err"></div>
-    <button name="go" class="go">เข้าเล่น</button>
+    <div class="si-tabs"><button type="button" data-t="login" class="on">เข้าสู่ระบบ</button><button type="button" data-t="signup">สมัครสมาชิก</button></div>
+    <form class="f-login" autocomplete="on" onsubmit="return false">
+      <label>ชื่อผู้ใช้<input name="username" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+      <label>รหัสผ่าน<input name="password" type="password" autocomplete="current-password"></label>
+      <div class="err"></div>
+      <button name="go" class="go">เข้าเล่น</button>
+      <div class="muted small">ลืมรหัสผ่าน? บอกครูให้ตั้งรหัสใหม่ให้</div>
+    </form>
+    <form class="f-signup" autocomplete="off" onsubmit="return false" hidden>
+      <label>ชื่อ-นามสกุล<input name="name" maxlength="80" placeholder="เช่น สมชาย ใจดี"></label>
+      <label>ชื่อผู้ใช้ <small>(ภาษาอังกฤษ/ตัวเลข 3-20 ตัว ใช้ตอนเข้าสู่ระบบ)</small><input name="username" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="เช่น somchai01"></label>
+      <div class="si-row2">
+        <label>รหัสผ่าน<input name="password" type="password" autocomplete="new-password"></label>
+        <label>ยืนยันรหัสผ่าน<input name="password2" type="password" autocomplete="new-password"></label>
+      </div>
+      <div class="consent">
+        <b>การเก็บข้อมูล</b>
+        <p>เกมนี้เป็นส่วนหนึ่งของโครงงานวิจัย ระบบจะเก็บ ชื่อ สิ่งที่พิมพ์ในเกม ข้อความ error ที่เจอ คำใบ้ที่ใช้
+        เวลาที่ใช้ในแต่ละด่าน ดาว และคะแนนแบบทดสอบ เพื่อให้ครูดูความคืบหน้า และนำไปวิเคราะห์ผลการเรียนรู้
+        ข้อมูลเก็บไว้ในเครื่องของครู/ผู้วิจัยเท่านั้น ไม่เผยแพร่ และขอลบได้ทุกเมื่อโดยแจ้งครู</p>
+        <label class="chk"><input type="checkbox" name="consent"> ฉันอ่านแล้วและยอมรับให้เก็บข้อมูลตามนี้</label>
+      </div>
+      <div class="err"></div>
+      <button name="go" class="go">สมัครและเข้าเล่น</button>
+    </form>
     <button type="button" class="guest linkbtn">เล่นแบบไม่บันทึก (ไม่ส่งข้อมูลใดๆ)</button>
-  </form>
-  <div class="si-wait si-code" hidden>
-    <div class="si-title">🐧 ล่ามเชลล์</div>
-    <div class="spin"></div>
-    <div><b>รอครูกดยอมรับ</b></div>
-    <div class="muted">ไม่พบชื่อ <b class="who"></b> ในรายชื่อนักเรียนของครู<br>บอกครูให้กดยอมรับในหน้าครู พอครูกดแล้วจะเข้าเกมเอง</div>
-    <button type="button" class="again linkbtn">พิมพ์ชื่อผิด? กรอกใหม่</button>
   </div>
 </div>
 <script type="module" src="js/boot.js"></script>

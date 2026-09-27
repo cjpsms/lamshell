@@ -210,13 +210,13 @@ async function submit(v) {
   history.push(text); histPos = history.length;
   busy = true;
   input.classList.add('busy');
-  const lvAt = L.lv, histAt = L.hist.length;
+  const lvAt = L.lv, histAt = L.hist.length, typedAt = Date.now();
   try {
     await handle(text);
     const ran = L.lv === lvAt && L.hist.length > histAt ? L.hist[L.hist.length - 1] : null;
     // Only the real playthrough becomes น้องล่าม's memories, not replays.
     if (L.live) logInput({ lv: lvAt.id, phase: lvAt.phase, said: text, ran: ran?.line || null, code: ran ? ran.code : null });
-    track('input', { lv: lvAt.id, phase: lvAt.phase, live: L.live, said: text, ran: ran?.line || null, exit: ran ? ran.code : null,
+    track('input', { t: typedAt, lv: lvAt.id, phase: lvAt.phase, live: L.live, said: text, ran: ran?.line || null, exit: ran ? ran.code : null,
       ai: !!ran?.translated, err: ran?.stderr ? ran.stderr.split('\n').find(Boolean) : null, ms: Date.now() - L.t0 });
   }
   catch (e) { console.error(e); sys('เกมสะดุด: ' + e.message, 'fail'); }
@@ -858,7 +858,7 @@ function renderSide() {
 $('#hint').onclick = useHint;
 // Who is playing, top of the side panel.
 $('#player').innerHTML = session
-  ? `👤 <b>${esc(session.name || '')}</b> ${esc(session.class)} เลขที่ ${esc(session.seat)}<button class="linkbtn" id="signout">ออกจากระบบ</button>`
+  ? `👤 <b>${esc(session.name || '')}</b> @${esc(session.username || '')}<button class="linkbtn" id="signout">ออกจากระบบ</button>`
   : `เล่นแบบไม่บันทึก<button class="linkbtn" id="signin-btn">ลงชื่อเข้าเล่น</button>`;
 $('#signout')?.addEventListener('click', signOut);
 $('#signin-btn')?.addEventListener('click', () => { try { localStorage.removeItem('lamshell.mode'); } catch {} location.reload(); });

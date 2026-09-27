@@ -3,7 +3,7 @@
 //
 // Events wait in an outbox in localStorage, so a flaky school network loses nothing; they go out every few
 // seconds and when the page closes.
-import { session, key } from './account.js';
+import { session, key, signOut } from './account.js';
 
 export const SAVED = ['lamshell.progress.v1', 'lamshell.world.v1', 'lamshell.journal.v1'];
 const OUTBOX = key('lamshell.outbox');
@@ -29,8 +29,9 @@ async function pushState() {
   try {
     const r = await fetch('api/state', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: session.code, data: JSON.parse(now) }),
+      body: JSON.stringify({ token: session.token, data: JSON.parse(now) }),
     });
+    if (r.status === 401) return signOut();   // the teacher reset the password: log in again
     if (r.ok) { last = now; put(SYNC, JSON.stringify({ dirty: false })); }
   } catch {} finally { pushing = false; }
 }
@@ -56,8 +57,9 @@ async function flush() {
   try {
     const r = await fetch('api/events', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: session.code, events: box }),
+      body: JSON.stringify({ token: session.token, events: box }),
     });
+    if (r.status === 401) return signOut();
     if (r.ok) put(OUTBOX, JSON.stringify(outbox().slice(box.length)));   // keep what was added meanwhile
   } catch {} finally { flushing = false; }
 }
@@ -66,9 +68,9 @@ if (session) {
   setInterval(() => { flush(); pushState(); }, 4000);
   addEventListener('pagehide', () => {
     const box = outbox();
-    if (box.length && navigator.sendBeacon(`api/events`, new Blob([JSON.stringify({ code: session.code, events: box })], { type: 'application/json' })))
+    if (box.length && navigator.sendBeacon(`api/events`, new Blob([JSON.stringify({ token: session.token, events: box })], { type: 'application/json' })))
       put(OUTBOX, '[]');
     const now = JSON.stringify(snapshot());
-    if (now !== last) navigator.sendBeacon('api/state', new Blob([JSON.stringify({ code: session.code, data: JSON.parse(now) })], { type: 'application/json' }));
+    if (now !== last) navigator.sendBeacon('api/state', new Blob([JSON.stringify({ token: session.token, data: JSON.parse(now) })], { type: 'application/json' }));
   });
 }

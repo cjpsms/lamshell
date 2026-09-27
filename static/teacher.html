@@ -22,34 +22,20 @@
 <div id="app" hidden>
   <header>
     <b>🍎 หน้าครู · ล่ามเชลล์</b>
-    <select id="klass"><option value="">ทุกห้อง</option></select>
     <span id="updated" class="muted"></span>
-    <button id="rosterbtn" class="btn">📋 รายชื่อนักเรียน</button>
     <a id="csv" href="api/teacher/export.csv">ดาวน์โหลด CSV</a>
     <button id="logout" class="link">ออกจากระบบ</button>
   </header>
   <nav>
     <button data-tab="people" class="on">ความคืบหน้ารายคน</button>
+    <button data-tab="stars">ดาวรายด่าน</button>
+    <button data-tab="log">log</button>
     <button data-tab="levels">ด่านที่ติดนาน</button>
     <button data-tab="errors">error ที่เจอบ่อย</button>
     <button data-tab="thai">ประโยคที่แปลไม่ออก</button>
     <button data-tab="quiz">แบบทดสอบ</button>
     <button data-tab="research">ตัวชี้วัดวิจัย</button>
   </nav>
-  <section id="roster" class="roster" hidden>
-    <h2>รายชื่อนักเรียน</h2>
-    <p class="note">เลือกไฟล์ Excel (.xlsx) หรือ CSV ที่มีคอลัมน์ <b>ชั้น</b>, <b>เลขที่</b>, <b>ชื่อ</b> (มี <b>นามสกุล</b> แยกก็ได้)
-      ใส่หลายห้องในไฟล์เดียวหรือแยกชีตละห้องก็ได้ (ตั้งชื่อชีตเป็นชั้น เช่น ม.4-2)<br>
-      ตอนนักเรียนลงชื่อ ระบบจะเทียบชื่อกับรายชื่อนี้: ตรงกันทุกตัวอักษร (ไม่นับคำนำหน้ากับช่องว่าง) เข้าเล่นได้เลย ถ้าไม่มีในรายชื่อต้องรอครูกดยอมรับ
-      (ยังไม่มีรายชื่อ = ใครลงชื่อก็เข้าได้) · เลือกไฟล์ห้องเดิมอีกครั้ง = แทนที่รายชื่อห้องนั้น</p>
-    <div class="rrow">
-      <label>ชั้น (ถ้าในไฟล์ไม่มีคอลัมน์ชั้น) <input id="rclass" placeholder="เช่น ม.4/2"></label>
-      <label class="btn">เลือกไฟล์…<input id="rfile" type="file" accept=".xlsx,.csv,.txt" hidden></label>
-      <a id="rtemplate" href="#">ดาวน์โหลดไฟล์ตัวอย่าง</a>
-      <button id="rclear" class="link">ลบรายชื่อทั้งหมด</button>
-    </div>
-    <div id="rstatus" class="note"></div>
-  </section>
   <main id="view"></main>
 </div>
 <script type="module" src="js/teacher.js"></script>

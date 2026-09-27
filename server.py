@@ -304,24 +304,23 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path, _, qs = self.path.partition("?")
-        params = dict(p.partition("=")[::2] for p in qs.split("&") if p)
-        klass = urllib.parse.unquote_plus(params.get("class", "")) or None
+        params = {k: urllib.parse.unquote_plus(v) for k, v in (p.partition("=")[::2] for p in qs.split("&") if p)}
         if path == "/api/health":
             return self.send_json({"ok": True, "ai": ai_available(), "model": MODEL})
         if path == "/api/teacher/status":
             return self.send_json({"set": bool(settings.load().get("teacher")), "in": self.teacher()})
+        if path.startswith("/api/teacher/") and not self.teacher():
+            return self.send_json({"error": "login"}, 401)
         if path == "/api/teacher/overview":
-            if not self.teacher():
-                return self.send_json({"error": "login"}, 401)
-            return self.send_json(classroom.overview(klass))
+            return self.send_json(classroom.overview())
+        if path == "/api/teacher/log":
+            return self.send_json({"rows": classroom.log(params.get("code") or None, params.get("before") or None)})
         if path == "/api/teacher/export.csv":
-            if not self.teacher():
-                return self.send_json({"error": "login"}, 401)
             buf = io.StringIO()
             w = csv.writer(buf)
-            w.writerow(["code", "name", "class", "seat", "time", "type", "level", "phase", "data"])
-            for r in classroom.export_rows(klass):
-                w.writerow([*r[:4], time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(r[4] / 1000)), *r[5:]])
+            w.writerow(["username", "name", "time", "type", "level", "phase", "data"])
+            for r in classroom.export_rows():
+                w.writerow([*r[:2], time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(r[2] / 1000)), *r[3:]])
             data = ("\ufeff" + buf.getvalue()).encode()   # BOM: Excel reads the Thai as UTF-8
             self.send_response(200)
             self.send_header("Content-Type", "text/csv; charset=utf-8")
@@ -339,23 +338,25 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             if path == "/api/interpret":
                 return self.send_json(interpret(self.body()))
-            if path == "/api/register":
+            if path in ("/api/signup", "/api/login"):
                 req = self.body()
-                me = classroom.register(req.get("name"), req.get("class"), req.get("seat"), req.get("consent") is True)
-                return self.send_json(me) if me else self.send_json({"error": "กรอกชื่อ ชั้น เลขที่ และกดยอมรับก่อน"}, 400)
-            if path == "/api/login":
-                me = classroom.login(self.body().get("code"))
-                return self.send_json(me) if me else self.send_json({"error": "ไม่พบผู้เล่นนี้"}, 404)
-            if path == "/api/state":
+                try:
+                    if path == "/api/signup":
+                        me = classroom.signup(req.get("name"), req.get("username"), req.get("password"),
+                                              req.get("password2"), req.get("consent") is True)
+                    else:
+                        me = classroom.login(req.get("username"), req.get("password"))
+                except classroom.AccountError as e:
+                    return self.send_json({"error": str(e)}, 400)
+                return self.send_json(me)
+            if path in ("/api/state", "/api/events"):
                 req = self.body(4_000_000)
-                code = classroom.norm_code(req.get("code"))
-                t = code and classroom.save_state(code, req.get("data") or {})
-                return self.send_json({"ok": True, "updated": t}) if t else self.send_json({"error": "unknown code"}, 404)
-            if path == "/api/events":
-                req = self.body(1_000_000)
-                code = classroom.norm_code(req.get("code"))
-                n = classroom.add_events(code, req.get("events") or []) if code else 0
-                return self.send_json({"ok": True, "n": n})
+                code = classroom.who(req.get("token"))
+                if not code:
+                    return self.send_json({"error": "login"}, 401)
+                if path == "/api/state":
+                    return self.send_json({"ok": True, "updated": classroom.save_state(code, req.get("data") or {})})
+                return self.send_json({"ok": True, "n": classroom.add_events(code, req.get("events") or [])})
             if path == "/api/teacher/login":
                 tok = classroom.teacher_login(self.body().get("password"))
                 return self.set_session(tok, {"ok": True}) if tok else self.send_json({"error": "รหัสผ่านไม่ถูกต้อง"}, 401)
@@ -366,16 +367,14 @@ class Handler(SimpleHTTPRequestHandler):
                 if not self.teacher():
                     return self.send_json({"error": "login"}, 401)
                 req = self.body()
-                if path == "/api/teacher/roster":
-                    return self.send_json(classroom.set_roster(req.get("rows") or []))
-                if path == "/api/teacher/roster/clear":
-                    classroom.clear_roster()
-                    return self.send_json({"ok": True})
-                if path == "/api/teacher/approve":
-                    classroom.approve(classroom.norm_code(req.get("code")))
+                if path == "/api/teacher/password":
+                    try:
+                        classroom.set_password(req.get("code"), req.get("password"))
+                    except classroom.AccountError as e:
+                        return self.send_json({"error": str(e)}, 400)
                     return self.send_json({"ok": True})
                 if path == "/api/teacher/delete":
-                    classroom.delete_code(classroom.norm_code(req.get("code")))
+                    classroom.delete_code(req.get("code"))
                     return self.send_json({"ok": True})
             return self.send_json({"error": "not found"}, 404)
         except Exception as e:

@@ -1,9 +1,8 @@
 // Teacher dashboard (design doc: "Dashboard ครู"). Progress per student (who's stuck > 5 min: the teacher is
 // hint #4), levels that take longest, the class's most common errors, Thai น้องล่าม couldn't translate,
 // checkpoint quiz results, and the research indicators. Refreshes every 10 seconds.
-import { LEVELS, phaseLabel } from './levels.js';
+import { LEVELS, PHASE_ORDER, phaseLabel } from './levels.js';
 import { CHECKPOINTS } from './quiz.js';
-import { parseFile, templateCsv } from './roster.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -52,115 +51,137 @@ function start() {
   document.querySelectorAll('nav button').forEach(b => {
     b.onclick = () => { tab = b.dataset.tab; document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b)); render(); };
   });
-  $('#klass').onchange = () => { $('#csv').href = 'api/teacher/export.csv' + ($('#klass').value ? '?class=' + encodeURIComponent($('#klass').value) : ''); load(); };
   $('#logout').onclick = async () => { await api('logout', {}); location.reload(); };
-  setupRoster();
   load();
   setInterval(load, 10000);
 }
 
 async function load() {
-  const k = $('#klass').value;
-  const r = await api('overview' + (k ? '?class=' + encodeURIComponent(k) : ''));
+  const r = await api('overview');
   if (r.status === 401) return location.reload();
   if (!r.ok) return;
   data = r.data;
-  const sel = $('#klass');
-  const have = [...sel.options].map(o => o.value);
-  for (const c of data.classes) if (!have.includes(c)) sel.add(new Option(c, c));
   $('#updated').textContent = 'อัปเดต ' + new Date(data.now).toLocaleTimeString('th-TH');
-  // Don't redraw under the teacher's cursor while they're selecting text.
-  if (!getSelection().toString()) render();
+  // Don't redraw under the teacher's cursor while they're selecting text or typing in a box.
+  if (getSelection().toString() || document.activeElement?.matches('input, select')) return;
+  if (tab === 'log') return loadLog();
+  render();
 }
 
 function render() {
   if (!data) return;
-  $('#view').innerHTML = { people, levels, errors, thai, quiz, research }[tab]();
+  if (tab === 'log') return loadLog();
+  $('#view').innerHTML = { people, stars, levels, errors, thai, quiz, research }[tab]();
   if (tab === 'people') {
     const act = (sel, fn) => document.querySelectorAll(sel).forEach(b => { b.onclick = () => fn(b.dataset); });
     act('.del', async d => {
-      if (!confirm(`ลบข้อมูลทั้งหมดของ ${d.name} (${d.code})? ลบแล้วกู้คืนไม่ได้`)) return;
+      if (!confirm(`ลบบัญชีและข้อมูลทั้งหมดของ ${d.name}? ลบแล้วกู้คืนไม่ได้`)) return;
       await api('delete', { code: d.code });
       load();
     });
-    act('.ok', async d => { await api('approve', { code: d.code }); load(); });
-    act('.no', async d => { await api('delete', { code: d.code }); load(); });
+    act('.pw', async d => {
+      const pw = prompt(`ตั้งรหัสผ่านใหม่ให้ ${d.name} (อย่างน้อย 4 ตัว) แล้วบอกนักเรียนเอง`);
+      if (!pw) return;
+      const r = await api('password', { code: d.code, password: pw });
+      alert(r.ok ? `ตั้งรหัสผ่านใหม่ให้ ${d.name} แล้ว` : r.data.error || 'ตั้งรหัสไม่สำเร็จ');
+    });
   }
 }
 
-// ---------- class list: read here from Excel/CSV, kept on the server, matched against names at sign-in ----------
-function setupRoster() {
-  const panel = $('#roster'), status = $('#rstatus');
-  const summary = () => {
-    const R = data?.roster || {};
-    const n = Object.values(R).reduce((a, c) => a + c.n, 0);
-    status.innerHTML = n ? `มีรายชื่อในระบบ ${n} คน: ${Object.entries(R).map(([k, c]) => `${esc(k)} ${c.n} คน`).join(', ')}` : 'ยังไม่มีรายชื่อ (ตอนนี้ใครลงชื่อก็เข้าเล่นได้เลย)';
-  };
-  $('#rosterbtn').onclick = () => { panel.hidden = !panel.hidden; summary(); };
-  $('#rfile').onchange = async e => {
-    const file = e.target.files[0];
-    e.target.value = '';
-    if (!file) return;
-    try {
-      const r = await parseFile(file, $('#rclass').value);
-      let msg = '';
-      if (r.rows.length) {
-        const res = await api('roster', { rows: r.rows });
-        if (!res.ok) throw new Error(res.data.error || 'บันทึกไม่สำเร็จ');
-        const per = Object.entries(r.classes).map(([k, n]) => `${esc(k)} ${n} คน`).join(', ');
-        msg = `✓ บันทึกรายชื่อ ${res.data.saved} คน (${per}) ห้องที่อยู่ในไฟล์นี้ถูกแทนที่ด้วยรายชื่อใหม่` +
-          (res.data.let_in ? ` · ปล่อยคนที่รออยู่เข้าเล่นแล้ว ${res.data.let_in} คน` : '');
-      } else msg = 'อ่านชื่อไม่ได้เลย';
-      status.innerHTML = msg + r.problems.map(p => `<div class="bad">⚠ ${esc(p)}</div>`).join('');
-      load();
-    } catch (x) { status.innerHTML = `<span class="bad">⚠ ${esc(x.message)}</span>`; }
-  };
-  $('#rtemplate').onclick = e => {
-    e.preventDefault();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([templateCsv()], { type: 'text/csv' }));
-    a.download = 'รายชื่อนักเรียน.csv';
-    a.click();
-  };
-  $('#rclear').onclick = async () => {
-    if (!confirm('ลบรายชื่อนักเรียนทั้งหมดออกจากระบบ? (ข้อมูลการเล่นยังอยู่ แต่ต่อไปใครลงชื่อก็เข้าได้เลย)')) return;
-    await api('roster/clear', {});
-    await load();
-    summary();
-  };
-}
-
 // ---------- tabs ----------
+const nameCell = s => `${esc(s.name)} <span class="muted">@${esc(s.username)}</span>`;
+
 function people() {
-  const all = data.students;
-  const waiting = all.filter(s => s.status === 'pending');
-  const S = all.filter(s => s.status !== 'pending');
-  const missing = Object.entries(data.roster || {}).filter(([, c]) => c.missing.length);
+  const S = data.students;
+  if (!S.length) return '<div class="empty">ยังไม่มีนักเรียนสมัครสมาชิก (นักเรียนสมัครเองได้ที่หน้าเกม)</div>';
   const stuck = S.filter(s => s.stuck);
   const cps = Object.keys(CHECKPOINTS);
-  const place = s => `${s.class} เลขที่ ${s.seat}`;
   const rows = S.map(s => `<tr class="${s.stuck ? 'stuck' : ''}">
-    <td><span class="dot ${s.online ? 'on' : ''}"></span>${esc(s.class)}</td><td>${esc(s.seat)}</td>
-    <td>${esc(s.name)}${s.listed ? '' : ' <span class="tag amber" title="ไม่อยู่ในรายชื่อ ครูกดยอมรับเอง">นอกรายชื่อ</span>'}</td>
+    <td><span class="dot ${s.online ? 'on' : ''}"></span>${nameCell(s)}</td>
     <td>${esc(lvName(s.current))}${s.stuck ? ` <span class="tag red">ติด ${mins(s.on_level_ms)}</span>` : s.on_level_ms != null && s.online ? ` <span class="muted">${mins(s.on_level_ms)}</span>` : ''}</td>
     <td>${esc(s.front || '-')}</td><td>★ ${s.stars}</td>
     ${cps.map(c => { const q = s.quiz[c]; return `<td>${q ? `<span class="tag ${q.passed ? 'green' : 'amber'}">${q.best}/${q.total}</span> <span class="muted">${q.tries} รอบ</span>` : '<span class="muted">-</span>'}</td>`; }).join('')}
     <td>${s.inputs}</td><td class="muted">${ago(s.last, data.now)}</td>
-    <td><button class="del" title="ลบข้อมูลนักเรียนคนนี้" data-code="${esc(s.code)}" data-name="${esc(s.name + ' ' + place(s))}">🗑</button></td></tr>`).join('');
-  return `${waiting.length ? `<div class="waiting"><h2>✋ รอครูกดยอมรับ (${waiting.length} คน)</h2>
-    <p class="note">ชื่อที่พิมพ์ไม่ตรงกับรายชื่อนักเรียน ดูว่าเป็นนักเรียนจริงไหม (หรือพิมพ์ชื่อผิด) แล้วกดยอมรับ</p>
-    <div class="tbl"><table><tr><th>ชื่อที่พิมพ์</th><th>ชั้น</th><th>เลขที่</th><th>ในรายชื่อ เลขที่นี้คือ</th><th>เมื่อ</th><th></th></tr>
-    ${waiting.map(s => `<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.class)}</td><td>${esc(s.seat)}</td>
-      <td class="muted">${esc(data.roster?.[s.class]?.missing.find(m => m.seat === s.seat)?.name || '-')}</td><td class="muted">${ago(s.last_seen, data.now)}</td>
-      <td><button class="btn ok" data-code="${esc(s.code)}">✓ ยอมรับ</button> <button class="btn no" data-code="${esc(s.code)}">✗ ไม่ใช่</button></td></tr>`).join('')}</table></div></div>` : ''}
-    ${stuck.length ? `<h2>🚨 ติดด่านเดิมเกิน 5 นาที (${stuck.length} คน) ครูไปช่วยได้เลย</h2>
-    <p class="note">${stuck.map(s => `<b>${esc(s.name)}</b> (${esc(place(s))}) ด่าน ${esc(lvName(s.current))}`).join(' · ')}</p>` : ''}
+    <td><button class="btn pw" data-code="${esc(s.code)}" data-name="${esc(s.name)}">ตั้งรหัสใหม่</button>
+      <button class="del" title="ลบบัญชีนี้" data-code="${esc(s.code)}" data-name="${esc(s.name)}">🗑</button></td></tr>`).join('');
+  return `${stuck.length ? `<h2>🚨 ติดด่านเดิมเกิน 5 นาที (${stuck.length} คน) ครูไปช่วยได้เลย</h2>
+    <p class="note">${stuck.map(s => `<b>${esc(s.name)}</b> ด่าน ${esc(lvName(s.current))}`).join(' · ')}</p>` : ''}
     <h2>ความคืบหน้ารายคน (${S.length} คน)</h2>
-    ${S.length ? `<p class="note">ด่านที่เปิดอยู่ = ด่านที่กำลังเล่นตอนนี้ · ไกลสุด = ด่านที่ปลดล็อกไกลที่สุด · จุดเขียว = ออนไลน์ภายใน 3 นาที</p>
-    <div class="tbl"><table><tr><th>ชั้น</th><th>เลขที่</th><th>ชื่อ</th><th>ด่านที่เปิดอยู่</th><th>ไกลสุด</th><th>ดาว</th>
-    ${cps.map(c => `<th>เช็กพอยต์ ${c}</th>`).join('')}<th>พิมพ์ไป</th><th>ล่าสุด</th><th></th></tr>${rows}</table></div>`
-    : '<div class="empty">ยังไม่มีนักเรียนเข้าเล่น</div>'}
-    ${missing.length ? `<h2>ยังไม่ได้ลงชื่อเข้าเล่น</h2>${missing.map(([k, c]) => `<p class="note"><b>${esc(k)}</b> (${c.missing.length}/${c.n} คน): ${c.missing.map(m => `${esc(m.seat)}. ${esc(m.name)}`).join(' · ')}</p>`).join('')}` : ''}`;
+    <p class="note">ด่านที่เปิดอยู่ = ด่านที่กำลังเล่นตอนนี้ · ไกลสุด = ด่านที่ปลดล็อกไกลที่สุด · จุดเขียว = ออนไลน์ภายใน 3 นาที · ลืมรหัสผ่าน: กด "ตั้งรหัสใหม่" แล้วบอกนักเรียน</p>
+    <div class="tbl"><table><tr><th>ชื่อ</th><th>ด่านที่เปิดอยู่</th><th>ไกลสุด</th><th>ดาว</th>
+    ${cps.map(c => `<th>เช็กพอยต์ ${c}</th>`).join('')}<th>พิมพ์ไป</th><th>ล่าสุด</th><th></th></tr>${rows}</table></div>`;
+}
+
+// Who got how many stars on which level: one row per student, one column per level (phase by phase), with the
+// phase's checkpoint quiz after its levels.
+function stars() {
+  const S = data.students;
+  if (!S.length) return '<div class="empty">ยังไม่มีนักเรียน</div>';
+  const cols = [];
+  for (const ph of PHASE_ORDER) {
+    const lv = LEVELS.filter(l => l.phase === ph);
+    cols.push({ ph, items: [...lv.map(l => ({ id: l.id, title: l.title })), ...(CHECKPOINTS[ph] ? [{ cp: ph }] : [])] });
+  }
+  const cell = (s, it) => {
+    if (it.cp) {
+      const q = s.quiz[it.cp];
+      return `<td class="cpc">${q ? `<span class="tag ${q.passed ? 'green' : 'amber'}">${q.best}/5</span>` : ''}</td>`;
+    }
+    const n = s.level_stars?.[it.id] || 0;
+    return `<td class="st s${n}" title="${esc(it.id + ' ' + it.title)}">${n ? '★'.repeat(n) : s.front === it.id ? '▶' : ''}</td>`;
+  };
+  const max = LEVELS.length * 3;
+  return `<h2>ดาวรายด่าน</h2><p class="note">★ = ดาวที่ได้ในด่านนั้น (สูงสุด 3) · ▶ = ด่านที่ไปถึงล่าสุด · ช่อง ✓ = คะแนนแบบทดสอบเช็กพอยต์ครั้งที่ดีที่สุด · ชี้ที่ช่องเพื่อดูชื่อด่าน</p>
+    <div class="tbl grid"><table>
+    <tr><th rowspan="2" class="sticky">ชื่อ</th><th rowspan="2">รวม</th>${cols.map(c => `<th colspan="${c.items.length}" class="ph">${esc(phaseLabel(c.ph))}</th>`).join('')}</tr>
+    <tr>${cols.map(c => c.items.map(it => `<th class="lvh">${it.cp ? '✓' + it.cp : esc(it.id)}</th>`).join('')).join('')}</tr>
+    ${S.map(s => `<tr><td class="sticky">${nameCell(s)}</td><td><b>${s.stars}</b><span class="muted">/${max}</span></td>
+      ${cols.map(c => c.items.map(it => cell(s, it)).join('')).join('')}</tr>`).join('')}
+    </table></div>`;
+}
+
+// ---------- log: everything students did, newest first ----------
+let logFilter = { code: '', typed: false };
+let logRows = [];
+function logText(e) {
+  const d = e.d || {};
+  switch (e.type) {
+    case 'input': return `<code>${esc(d.said)}</code>` + (d.ran && d.ran !== d.said ? ` <span class="muted">→ น้องล่ามรัน</span> <code>${esc(d.ran)}</code>` : '') +
+      (d.err ? `<div class="errline">${esc(d.err)}</div>` : '') + (d.exit != null ? ` <span class="muted">[exit ${d.exit}]</span>` : '');
+    case 'untranslated': return `<code>${esc(d.said)}</code> <span class="tag amber">น้องล่ามแปลไม่ออก</span>`;
+    case 'level_start': return `เปิดด่าน${d.replay ? ' (เล่นซ้ำ)' : d.live === false ? ' (ย้อนเล่นด่านเก่า)' : ''}`;
+    case 'pass': return `<span class="tag green">ผ่าน ${'★'.repeat(d.stars || 0)}</span> พิมพ์ ${d.attempts} ครั้ง · ${mins(d.ms)} · คำใบ้ ${d.hints || 0} ขั้น${d.decoder ? ' · เปิดสมุด' : ''}`;
+    case 'hint': return `ใช้คำใบ้ขั้น ${d.step}`;
+    case 'decoder': return 'เปิดสมุดถอดรหัส error';
+    case 'preview_delete': return `ดูก่อนลบ ${d.n} รายการ → ${d.yes ? 'ยืนยันลบ' : 'ยกเลิก'}`;
+    case 'quiz_start': return `เริ่มแบบทดสอบเช็กพอยต์ ${d.cp}`;
+    case 'quiz': return `แบบทดสอบเช็กพอยต์ ${d.cp}: <b>${d.score}/${d.total}</b> <span class="tag ${d.passed ? 'green' : 'amber'}">${d.passed ? 'ผ่าน' : 'ไม่ผ่าน'}</span>`;
+    default: return esc(e.type);
+  }
+}
+
+async function loadLog(more = false) {
+  const q = new URLSearchParams();
+  if (logFilter.code) q.set('code', logFilter.code);
+  if (more && logRows.length) q.set('before', `${logRows[logRows.length - 1].ts}:${logRows[logRows.length - 1].id}`);
+  const r = await api('log?' + q);
+  if (!r.ok) return;
+  logRows = more ? [...logRows, ...r.data.rows] : r.data.rows;
+  if (tab !== 'log') return;
+  const rows = logFilter.typed ? logRows.filter(e => e.type === 'input' || e.type === 'untranslated') : logRows;
+  const day = t => new Date(t).toLocaleDateString('th-TH', { dateStyle: 'medium' });
+  let lastDay = '';
+  $('#view').innerHTML = `<h2>log</h2>
+    <div class="logbar"><select id="logwho"><option value="">ทุกคน</option>${data.students.map(s => `<option value="${esc(s.code)}" ${s.code === logFilter.code ? 'selected' : ''}>${esc(s.name)} (@${esc(s.username)})</option>`).join('')}</select>
+      <label><input type="checkbox" id="logtyped" ${logFilter.typed ? 'checked' : ''}> เฉพาะสิ่งที่พิมพ์</label>
+      <span class="muted">ใหม่สุดอยู่บน · อัปเดตเองทุก 10 วินาที</span></div>
+    ${rows.length ? `<div class="tbl"><table><tr><th>เวลา</th><th>ชื่อ</th><th>ด่าน</th><th>เกิดอะไรขึ้น</th></tr>
+    ${rows.map(e => { const d = day(e.ts); const sep = d !== lastDay ? `<tr class="daysep"><td colspan="4">${esc(d)}</td></tr>` : ''; lastDay = d;
+      return `${sep}<tr><td class="muted">${new Date(e.ts).toLocaleTimeString('th-TH')}</td><td>${esc(e.name)}</td><td>${esc(e.level || (e.d?.cp ? 'เช็กพอยต์ ' + e.d.cp : '-'))}</td><td class="wrap">${logText(e)}</td></tr>`; }).join('')}
+    </table></div>${r.data.rows.length >= 300 ? '<button id="logmore" class="btn">โหลดเก่ากว่านี้</button>' : ''}` : '<div class="empty">ยังไม่มีอะไรใน log</div>'}`;
+  $('#logwho').onchange = e => { logFilter.code = e.target.value; loadLog(); };
+  $('#logtyped').onchange = e => { logFilter.typed = e.target.checked; loadLog(); };
+  $('#logmore')?.addEventListener('click', () => loadLog(true));
 }
 
 function levels() {

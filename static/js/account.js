@@ -1,4 +1,4 @@
-// Who is playing. Signed in = { code, name, class, seat } from the server; otherwise a guest (nothing leaves the
+// Who is playing. Logged in = { token, code, username, name } from the server; otherwise a guest (nothing leaves the
 // browser, as before). Every save key is per player, so students sharing a school computer never mix saves.
 const SESSION = 'lamshell.session';
 
