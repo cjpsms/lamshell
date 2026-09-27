@@ -9,7 +9,7 @@ import { logInput, clearJournal } from './journal.js';
 import { session, key, signOut } from './account.js';
 import { track } from './sync.js';
 import { CHECKPOINTS, runQuiz } from './quiz.js';
-import { mountPiki, findPage } from './piki.js';
+import { PAGES as PIKI_PAGES, mountPiki, findPage } from './piki.js';
 
 const WHO = {
   lam: ['น้องล่าม', '🐧'], kru: ['ครูสมใจ', '👩‍🏫'], root: ['พี่รูท', '🧑‍💻'],
@@ -286,7 +286,18 @@ async function loadLevel(idx, { replay = false, reset = false } = {}) {
   if (first && !replay) sys(`— ${phaseLabel(lv.phase)}: ${PHASES[lv.phase].name} — ${PHASES[lv.phase].lam}`, 'phase');
   if (replay) sys('⏪ ย้อนเวลาแล้ว โลกกลับเป็นเหมือนตอนเริ่มด่าน', 'phase');
   else for (const [who, t] of lv.intro) { say(who, t); await sleep(250); }
+  if (first && !replay && L.lv === lv) pikiTip(lv);
   input.focus();
+}
+
+// Nobody would know Piki exists: say so (text only, no voice) at the start of every phase, more firmly once
+// nobody translates any more.
+function pikiTip(lv) {
+  const strict = STRICT.has(lv.phase);
+  const el = note(`📘 <b>Piki</b> คู่มือคำสั่งของเครื่องนี้ ${strict ? 'ต่อจากนี้ไม่มีใครแปลให้แล้ว ติดตรงไหนเปิดอ่านได้ ไม่หักดาว' : 'อยากรู้ละเอียดว่าคำสั่งไหนทำอะไร เปิดอ่านได้ ไม่หักดาว'}` +
+    `<br>เปิดได้ 3 ทาง: ปุ่ม <b>+</b> บนแถบแท็บ · ปุ่ม <b>📘 Piki</b> ใต้ภารกิจ · พิมพ์ <code>piki ชื่อคำสั่ง</code> เช่น <code>piki cd</code>` +
+    ` <button class="pkopen">เปิด Piki</button>`, 'sys pktip');
+  el.querySelector('.pkopen').onclick = () => openPiki();
 }
 
 // ---------- checkpoint quizzes ----------
@@ -843,8 +854,12 @@ function renderSide() {
   $('#lvtitle').textContent = lv.title;
   $('#lvphase').textContent = `${phaseLabel(lv.phase)} · ${PHASES[lv.phase].name}`;
   $('#mission').textContent = lv.mission;
-  $('#gui').hidden = !GUI[lv.id];
-  $('#gui').textContent = GUI[lv.id] ? '🖱️ เทียบกับ Windows: ' + GUI[lv.id] : '';
+  // Windows comparison + a link to the Piki page(s) this level introduces.
+  const pages = PIKI_PAGES.filter(p => p.at === lv.id);
+  $('#gui').hidden = !GUI[lv.id] && !pages.length;
+  $('#gui').innerHTML = (GUI[lv.id] ? '🖱️ เทียบกับ Windows: ' + esc(GUI[lv.id]) : '') +
+    (pages.length ? `<div class="gui-pk">📘 อ่านละเอียดใน Piki: ${pages.map(p => `<a href="#" data-pk="${p.id}">${esc(p.title)}</a>`).join(' · ')}</div>` : '');
+  $('#gui').querySelectorAll('[data-pk]').forEach(a => { a.onclick = e => { e.preventDefault(); openPiki(a.dataset.pk); }; });
   renderSteps();
   const best = progress.stars[lv.id] || 0;
   $('#lvstars').textContent = L.passed ? starStr(L.stars) : best ? `สถิติ ${starStr(best)}` : '☆☆☆';

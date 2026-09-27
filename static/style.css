@@ -321,6 +321,11 @@ mark { background: #4a3a14; color: var(--c-yellow); padding: 0 2px; }
 .lvbtn.cp { border-style: dashed; color: var(--c-cyan); }
 .gui { margin-top: 8px; padding: 6px 10px; border-radius: 4px; background: #16202b; color: #9fc6e6; font-size: 13px; line-height: 1.5; }
 .gui[hidden] { display: none; }
+.gui-pk { margin-top: 2px; }
+.gui a { color: var(--blue); }
+.f.pktip { background: #14202b; border-left: 3px solid var(--blue); padding: 6px 10px; border-radius: 4px; color: #cfe3f5; line-height: 1.6; }
+.f.pktip code { font-family: var(--mono); background: #0c0c0c; padding: 0 4px; border-radius: 3px; }
+.f.pktip .pkopen { margin-left: 4px; background: #1f3a55; border: 1px solid #36597d; color: #fff; border-radius: 4px; padding: 1px 10px; font-size: 12.5px; }
 .who-serv .who { color: var(--c-cyan); }
 .cast-name.who-serv { color: var(--c-cyan); }
 
