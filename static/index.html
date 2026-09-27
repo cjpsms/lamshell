@@ -26,6 +26,7 @@
       <span id="ai" class="ai">AI …</span>
       <button id="sound" class="soundbtn"></button>
     </div>
+    <div id="player" class="player"></div>
 
     <div id="cast" class="cast">
       <canvas hidden></canvas>
@@ -78,10 +79,32 @@
           <div class="inrow"><span id="pcwd" class="pcwd"></span><span id="plabel" class="plabel"></span><input id="cmd" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
         </div>
         <div id="overlay" class="overlay"></div>
+        <div id="quiz" class="quiz"></div>
       </div>
     </div>
   </div>
 </main>
-<script type="module" src="js/game.js"></script>
+<div id="signin" class="signin" hidden>
+  <form autocomplete="off">
+    <div class="si-title">🐧 ล่ามเชลล์</div>
+    <div class="muted">ลงชื่อก่อนเล่น ความคืบหน้าจะถูกบันทึกไว้ เล่นต่อจากเครื่องไหนก็ได้</div>
+    <label>ชื่อ-นามสกุล<input name="name" maxlength="80" placeholder="เช่น สมชาย ใจดี"></label>
+    <div class="si-row">
+      <label>ชั้น<input name="klass" maxlength="20" placeholder="เช่น ม.4/2"></label>
+      <label>เลขที่<input name="seat" maxlength="4" inputmode="numeric" placeholder="เช่น 12"></label>
+    </div>
+    <div class="consent">
+      <b>การเก็บข้อมูล</b>
+      <p>เกมนี้เป็นส่วนหนึ่งของโครงงานวิจัย ระบบจะเก็บ ชื่อ ชั้น เลขที่ สิ่งที่พิมพ์ในเกม ข้อความ error ที่เจอ คำใบ้ที่ใช้
+      เวลาที่ใช้ในแต่ละด่าน และคะแนนแบบทดสอบ เพื่อให้ครูดูความคืบหน้า และนำไปวิเคราะห์ผลการเรียนรู้
+      ข้อมูลเก็บไว้ในเซิร์ฟเวอร์ของโรงเรียน/ผู้วิจัยเท่านั้น ไม่เผยแพร่ชื่อ และขอลบได้ทุกเมื่อโดยแจ้งครู</p>
+      <label class="chk"><input type="checkbox" name="consent"> ฉันอ่านแล้วและยอมรับให้เก็บข้อมูลตามนี้</label>
+    </div>
+    <div class="err"></div>
+    <button name="go" class="go">เข้าเล่น</button>
+    <button type="button" class="guest linkbtn">เล่นแบบไม่บันทึก (ไม่ส่งข้อมูลใดๆ)</button>
+  </form>
+</div>
+<script type="module" src="js/boot.js"></script>
 </body>
 </html>

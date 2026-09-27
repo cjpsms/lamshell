@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240">
+  <!-- ป้าเซิร์ฟ: the school server, a tower case with a face on its front panel and a pair of reading glasses -->
+  <defs>
+    <linearGradient id="body" x1="0" x2="1"><stop offset="0" stop-color="#3a4150"/><stop offset=".55" stop-color="#4b5465"/><stop offset="1" stop-color="#323845"/></linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#11161d"/><stop offset="1" stop-color="#0b0f14"/></linearGradient>
+  </defs>
+  <ellipse cx="100" cy="232" rx="70" ry="6" fill="#000" opacity=".45"/>
+  <rect x="34" y="14" width="132" height="214" rx="14" fill="url(#body)" stroke="#232833" stroke-width="3"/>
+  <rect x="46" y="28" width="108" height="92" rx="10" fill="url(#panel)" stroke="#5fd4cf" stroke-opacity=".35" stroke-width="2"/>
+  <!-- glasses + eyes -->
+  <circle cx="76" cy="66" r="15" fill="none" stroke="#c9a86a" stroke-width="3"/>
+  <circle cx="124" cy="66" r="15" fill="none" stroke="#c9a86a" stroke-width="3"/>
+  <path d="M91 66 q9 -6 18 0" fill="none" stroke="#c9a86a" stroke-width="3"/>
+  <rect x="70" y="58" width="12" height="16" rx="6" fill="#61d6d6"/>
+  <rect x="118" y="58" width="12" height="16" rx="6" fill="#61d6d6"/>
+  <circle cx="58" cy="90" r="6" fill="#ff8fb8" opacity=".45"/>
+  <circle cx="142" cy="90" r="6" fill="#ff8fb8" opacity=".45"/>
+  <path d="M84 94 q16 14 32 0" fill="none" stroke="#61d6d6" stroke-width="4" stroke-linecap="round"/>
+  <!-- drive bays -->
+  <g fill="#262c37" stroke="#1b2029" stroke-width="2">
+    <rect x="50" y="134" width="100" height="16" rx="3"/>
+    <rect x="50" y="156" width="100" height="16" rx="3"/>
+    <rect x="50" y="178" width="100" height="16" rx="3"/>
+  </g>
+  <g fill="#16c60c"><circle cx="138" cy="142" r="3"/><circle cx="138" cy="164" r="3"/></g>
+  <circle cx="138" cy="186" r="3" fill="#ffb547"/>
+  <g stroke="#1b2029" stroke-width="2"><path d="M60 142h50M60 164h50M60 186h50"/></g>
+  <!-- power button -->
+  <circle cx="100" cy="210" r="7" fill="#1b2029" stroke="#61d6d6" stroke-width="2"/>
+  <path d="M100 205v5" stroke="#61d6d6" stroke-width="2" stroke-linecap="round"/>
+  <!-- hair bun: a tangle of network cable -->
+  <path d="M70 16 q-6 -14 10 -12 q4 -10 14 -2 q10 -9 16 2 q14 -4 10 12" fill="#8f97a6" stroke="#5c6370" stroke-width="2"/>
+</svg>

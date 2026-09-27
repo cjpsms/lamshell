@@ -27,7 +27,7 @@ The selling point is **learning to read errors**: every error is the exact GNU c
 - `static/js/stage.js`: the character stage. The speaker shows as a VRM model (three.js + three-vrm) that blinks,
   breathes, changes expression and moves its mouth while talking. Models in `static/models/` were made by cj in
   VRoid Studio from VRoid sample models (VRoidPreset A-Z terms: free use, not CC0).
-- `static/js/levels.js`: 38 levels (phases 1–4 + bridge). Each builds its own world and passes on the *state of the
+- `static/js/levels.js`: 44 levels (phases 1–4, bridge, rescue, last act). Each builds its own world and passes on the *state of the
   world*, not on matching the exact text typed.
 
 ## Run
@@ -54,8 +54,24 @@ The whole game is one machine (`static/js/world.js`): every file the levels use 
 adds the virus's files as it goes, and what the player does carries over (delete a work file and ครูสมใจ restores it).
 น้องล่าม's memory files are written from what the player actually typed (`static/js/journal.js`).
 
-Voice acting: every fixed line is voiced (ElevenLabs, `static/voice/`, built by `tools/voices/`).
+Voice acting: every fixed line is voiced (ElevenLabs, `static/voice/`, built by `tools/voices/`), except ป้าเซิร์ฟ,
+who uses a Gemini voice.
+
+## Classroom
+
+- **Sign in**: students type their real name, class and seat number and tick the consent box (what gets collected
+  and why) before playing. The same three on another computer continue the same save (kept on the server). A
+  "play without saving" guest mode sends nothing.
+- **Checkpoint quizzes** (`static/js/quiz.js`): after phases 1–4, ป้าเซิร์ฟ (the school server herself) asks
+  5 questions drawn from a bank (what a command does, what a real error means). 4/5 (80%) opens the next phase;
+  retries draw new questions.
+- **Teacher dashboard** at `/teacher` (password set on first visit): progress per student with anyone stuck on one
+  level over 5 minutes flagged, slowest levels, the class's most common errors, Thai น้องล่าม couldn't translate,
+  quiz results per question, research indicators (repeated-error rate, AI reliance, decoder use, look before
+  delete), and a CSV export of every event.
+- Data lives in `data/lamshell.db` (SQLite, gitignored). For a real classroom run the server with
+  `LAMSHELL_HOST=0.0.0.0` so the students' computers can reach it.
 
 ## Not done yet
 
-Checkpoint quizzes, user login / per-student logging, teacher dashboard.
+Voices for ป้าเซิร์ฟ (Gemini TTS, `tools/voices/tts_build.py --who serv`), the v86 "real Linux" ending.

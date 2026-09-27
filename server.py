@@ -3,6 +3,8 @@
 
 Stdlib only. Haiku runs through the `claude -p` CLI (Pro subscription, no API key).
 """
+import csv
+import io
 import json
 import os
 import re
@@ -10,14 +12,19 @@ import shutil
 import subprocess
 import threading
 import time
+import urllib.parse
 from collections import OrderedDict
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+import classroom
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 LOG_DIR = ROOT / "logs"
 PORT = int(os.environ.get("LAMSHELL_PORT", "4011"))
+# 127.0.0.1 by default. For a real classroom, LAMSHELL_HOST=0.0.0.0 lets the students' computers reach it.
+HOST = os.environ.get("LAMSHELL_HOST", "127.0.0.1")
 MODEL = "haiku"
 
 SYSTEM_PROMPT = """คุณคือ "น้องล่าม" ภูตเพนกวินตัวจิ๋วที่อาศัยอยู่ใน shell ของเครื่อง "ป้าเซิร์ฟ" ในเกมสอน Linux สำหรับนักเรียนมัธยมไทย
@@ -225,7 +232,7 @@ LOG_LOCK = threading.Lock()
 
 def log_input(req: dict, res: dict, ms: int, cached: bool):
     LOG_DIR.mkdir(exist_ok=True)
-    row = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "level": req.get("level"), "phase": req.get("phase"),
+    row = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "code": req.get("code"), "level": req.get("level"), "phase": req.get("phase"),
            "text": req.get("text"), "command": res.get("command"), "confidence": res.get("confidence"),
            "ms": ms, "cached": cached}
     with LOG_LOCK, open(LOG_DIR / "inputs.jsonl", "a", encoding="utf-8") as f:
@@ -254,7 +261,7 @@ class Handler(SimpleHTTPRequestHandler):
     extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".js": "text/javascript", ".mjs": "text/javascript"}
 
     def log_message(self, fmt, *args):
-        if "/api/" in (args[0] if args else ""):
+        if "/api/" in str(args[0] if args else ""):
             super().log_message(fmt, *args)
 
     def end_headers(self):
@@ -269,28 +276,111 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def body(self, limit=64_000):
+        n = int(self.headers.get("Content-Length", "0"))
+        if n > limit:
+            raise ValueError("too large")
+        return json.loads(self.rfile.read(n) or b"{}")
+
+    def cookie(self, name):
+        for part in (self.headers.get("Cookie") or "").split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == name:
+                return v
+        return None
+
+    def teacher(self):
+        return classroom.session_ok(self.cookie("lamteach"))
+
+    def set_session(self, tok, obj):
+        data = json.dumps(obj, ensure_ascii=False).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        age = classroom.SESSION_DAYS * 86400 if tok else 0
+        self.send_header("Set-Cookie", f"lamteach={tok or ''}; Path=/; HttpOnly; SameSite=Strict; Max-Age={age}")
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self):
-        if self.path == "/api/health":
+        path, _, qs = self.path.partition("?")
+        params = dict(p.partition("=")[::2] for p in qs.split("&") if p)
+        klass = urllib.parse.unquote_plus(params.get("class", "")) or None
+        if path == "/api/health":
             return self.send_json({"ok": True, "ai": ai_available(), "model": MODEL})
+        if path == "/api/teacher/status":
+            return self.send_json({"set": classroom.teacher_is_set(), "in": self.teacher()})
+        if path == "/api/teacher/overview":
+            if not self.teacher():
+                return self.send_json({"error": "login"}, 401)
+            return self.send_json(classroom.overview(klass))
+        if path == "/api/teacher/export.csv":
+            if not self.teacher():
+                return self.send_json({"error": "login"}, 401)
+            buf = io.StringIO()
+            w = csv.writer(buf)
+            w.writerow(["code", "name", "class", "seat", "time", "type", "level", "phase", "data"])
+            for r in classroom.export_rows(klass):
+                w.writerow([*r[:4], time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(r[4] / 1000)), *r[5:]])
+            data = ("\ufeff" + buf.getvalue()).encode()   # BOM: Excel reads the Thai as UTF-8
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Disposition", 'attachment; filename="lamshell-events.csv"')
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        if path == "/teacher":
+            self.path = "/teacher.html"
         return super().do_GET()
 
     def do_POST(self):
-        if self.path != "/api/interpret":
-            return self.send_json({"error": "not found"}, 404)
+        path = self.path.partition("?")[0]
         try:
-            n = int(self.headers.get("Content-Length", "0"))
-            if n > 64_000:
-                return self.send_json({"error": "too large"}, 413)
-            req = json.loads(self.rfile.read(n) or b"{}")
-            return self.send_json(interpret(req))
+            if path == "/api/interpret":
+                return self.send_json(interpret(self.body()))
+            if path == "/api/register":
+                req = self.body()
+                me = classroom.register(req.get("name"), req.get("class"), req.get("seat"), req.get("consent") is True)
+                return self.send_json(me) if me else self.send_json({"error": "กรอกชื่อ ชั้น เลขที่ และกดยอมรับก่อน"}, 400)
+            if path == "/api/login":
+                me = classroom.login(self.body().get("code"))
+                return self.send_json(me) if me else self.send_json({"error": "ไม่พบผู้เล่นนี้"}, 404)
+            if path == "/api/state":
+                req = self.body(4_000_000)
+                code = classroom.norm_code(req.get("code"))
+                t = code and classroom.save_state(code, req.get("data") or {})
+                return self.send_json({"ok": True, "updated": t}) if t else self.send_json({"error": "unknown code"}, 404)
+            if path == "/api/events":
+                req = self.body(1_000_000)
+                code = classroom.norm_code(req.get("code"))
+                n = classroom.add_events(code, req.get("events") or []) if code else 0
+                return self.send_json({"ok": True, "n": n})
+            if path == "/api/teacher/setup":
+                tok = classroom.teacher_setup(self.body().get("password"))
+                return self.set_session(tok, {"ok": True}) if tok else self.send_json({"error": "ตั้งรหัสไม่ได้"}, 400)
+            if path == "/api/teacher/login":
+                tok = classroom.teacher_login(self.body().get("password"))
+                return self.set_session(tok, {"ok": True}) if tok else self.send_json({"error": "รหัสผ่านไม่ถูกต้อง"}, 401)
+            if path == "/api/teacher/logout":
+                classroom.end_session(self.cookie("lamteach"))
+                return self.set_session(None, {"ok": True})
+            if path.startswith("/api/teacher/"):
+                if not self.teacher():
+                    return self.send_json({"error": "login"}, 401)
+                req = self.body()
+                if path == "/api/teacher/delete":
+                    classroom.delete_code(classroom.norm_code(req.get("code")))
+                    return self.send_json({"ok": True})
+            return self.send_json({"error": "not found"}, 404)
         except Exception as e:
-            self.log_error("interpret failed: %s", e)
+            self.log_error("%s failed: %s", path, e)
             return self.send_json({"error": str(e)[:300]}, 502)
 
 
 def main():
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"LamShell on http://127.0.0.1:{PORT}  (AI: {MODEL}, claude CLI found={ai_available()})", flush=True)
+    srv = ThreadingHTTPServer((HOST, PORT), Handler)
+    print(f"LamShell on http://{HOST}:{PORT}  (AI: {MODEL}, claude CLI found={ai_available()})", flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

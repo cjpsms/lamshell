@@ -15,4 +15,7 @@ VOICES = {
   "virus": dict(display_name="silver-techwear", gender="female", pitch="medium",
     persona="Cool and composed, silver hair, techwear coat",
     input="A cool, confident young Thai woman: a slightly low, smooth voice, relaxed and composed, with a playful tone."),
+  "serv": dict(display_name="pa-serv", gender="female", pitch="medium",
+    persona="Warm school auntie, the school server",
+    input="A warm, kind middle-aged Thai woman like a favourite school auntie: clear and patient, gently encouraging, a little proud when someone does well, calm steady pace."),
 }

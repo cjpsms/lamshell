@@ -8,8 +8,9 @@
 import { VFS, baseFS } from './vfs.js';
 import { Shell } from './shell.js';
 import { LEVELS, initialWorld } from './levels.js';
+import { key } from './account.js';
 
-const STORE = 'lamshell.world.v1';
+const STORE = key('lamshell.world.v1');
 
 function load() {
   try { return JSON.parse(localStorage.getItem(STORE) || 'null'); } catch { return null; }

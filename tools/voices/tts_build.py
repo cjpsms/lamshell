@@ -8,7 +8,7 @@ uncut audio of every request is kept in tools/voices/raw/, and each finished bat
 static/voice/manifest.json right away, so a run that hits the daily free quota just continues tomorrow.
 
   deno run --allow-read --allow-write tools/voices/extract_lines.mjs     # refresh lines.json
-  GKEY=... python3 tools/voices/tts_build.py                              # key only from the environment
+  GKEY=... python3 tools/voices/tts_build.py [--who serv]                  # key only from the environment
   python3 tools/voices/tts_build.py --check                               # re-check existing files, drop bad ones
 """
 import base64, json, os, re, subprocess, sys, time, urllib.error, urllib.request
@@ -147,7 +147,8 @@ def main():
     lines = json.load(open(os.path.join(HERE, 'lines.json')))
     voices = json.load(open(os.path.join(HERE, 'voice_ids.json')))
     manifest = load_manifest()
-    todo = [l for l in lines if key(l['who'], l['text']) not in manifest and l['who'] in voices]
+    only = sys.argv[sys.argv.index('--who') + 1] if '--who' in sys.argv else None   # e.g. --who serv
+    todo = [l for l in lines if key(l['who'], l['text']) not in manifest and l['who'] in voices and (not only or l['who'] == only)]
     batches = []
     for who in dict.fromkeys(l['who'] for l in todo):
         mine = [l for l in todo if l['who'] == who]

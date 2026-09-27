@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ล่ามเชลล์ · ครู</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍎</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Cascadia+Mono:wght@400;700&family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="teacher.css">
+</head>
+<body>
+<div id="auth" class="auth" hidden>
+  <form>
+    <h1>🍎 หน้าครู · ล่ามเชลล์</h1>
+    <p class="muted" id="authmsg"></p>
+    <input type="password" name="pw" placeholder="รหัสผ่านครู" autocomplete="current-password">
+    <input type="password" name="pw2" placeholder="พิมพ์รหัสอีกครั้ง" hidden autocomplete="new-password">
+    <div class="err"></div>
+    <button>เข้าสู่ระบบ</button>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <b>🍎 หน้าครู · ล่ามเชลล์</b>
+    <select id="klass"><option value="">ทุกห้อง</option></select>
+    <span id="updated" class="muted"></span>
+    <a id="csv" href="api/teacher/export.csv">ดาวน์โหลด CSV</a>
+    <button id="logout" class="link">ออกจากระบบ</button>
+  </header>
+  <nav>
+    <button data-tab="people" class="on">ความคืบหน้ารายคน</button>
+    <button data-tab="levels">ด่านที่ติดนาน</button>
+    <button data-tab="errors">error ที่เจอบ่อย</button>
+    <button data-tab="thai">ประโยคที่แปลไม่ออก</button>
+    <button data-tab="quiz">แบบทดสอบ</button>
+    <button data-tab="research">ตัวชี้วัดวิจัย</button>
+  </nav>
+  <main id="view"></main>
+</div>
+<script type="module" src="js/teacher.js"></script>
+</body>
+</html>

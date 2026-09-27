@@ -1,6 +1,8 @@
 // What the player has typed, level by level. น้องล่าม's memory files (made when the virus locks her away) are written
 // from this, so her memories are of this player: the first thing they said to her, their Thai, the night she fell.
-const KEY = 'lamshell.journal.v1';
+import { key } from './account.js';
+
+const KEY = key('lamshell.journal.v1');
 const MAX = 400;
 
 export function journal() {

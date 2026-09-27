@@ -1,8 +1,12 @@
+# Design the characters' Gemini voices (only the ones not designed yet). IDs go to tools/voices/voice_ids.json
+# (gitignored), sample clips to ~/Downloads/lamshell-voices/.   GKEY=... python3 tools/voices/make_voices.py
 import json, base64, os, sys, urllib.request
 from voices_spec import VOICES
 KEY = os.environ["GKEY"]
 out_dir = os.path.expanduser("~/Downloads/lamshell-voices")
-ids = json.load(open(f"{out_dir}/voice_ids.json")) if os.path.exists(f"{out_dir}/voice_ids.json") else {}
+os.makedirs(out_dir, exist_ok=True)
+ids_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voice_ids.json")
+ids = json.load(open(ids_path)) if os.path.exists(ids_path) else {}
 for who, v in VOICES.items():
     if who in ids: continue
     body = {"store": True, "voice": {"type": "prompted", "prompted": {"input": v["input"]}, "display_name": v["display_name"],
@@ -19,4 +23,4 @@ for who, v in VOICES.items():
     if sa.get("data"):
         open(f"{out_dir}/{who}.wav", "wb").write(base64.b64decode(sa["data"]))
     print(who, vid, sa.get("mime_type") or sa.get("mimeType"), "sample" if sa.get("data") else "no sample", d.get("usage"))
-json.dump(ids, open(f"{out_dir}/voice_ids.json", "w"), indent=1)
+json.dump(ids, open(ids_path, "w"), indent=1)
