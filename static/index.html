@@ -41,17 +41,17 @@
       <div class="mission"><div class="label">ภารกิจ</div><div id="mission"></div><ul id="steps" class="steps"></ul><div id="gui" class="gui" hidden></div></div>
       <div class="actions">
         <button id="hint"></button>
-        <button id="reset" title="ย้อนเวลา: รีเซ็ตโลกของด่านนี้กลับไปตอนเริ่มด่าน">⏪ ย้อนเวลา</button>
-        <button id="pikibtn" title="เปิด Piki คู่มือคำสั่ง (หรือพิมพ์ piki ชื่อคำสั่ง)">📘 Piki</button>
+        <button id="reset" title="ย้อนเวลา: รีเซ็ตโลกของด่านนี้กลับไปตอนเริ่มด่าน"><span data-ic="rewind"></span>ย้อนเวลา</button>
+        <button id="pikibtn" title="เปิด Piki คู่มือคำสั่ง (หรือพิมพ์ piki ชื่อคำสั่ง)"><span data-ic="book"></span>Piki</button>
       </div>
       <div id="hintnote" class="muted small"></div>
     </section>
 
     <section id="feed" class="feed" aria-live="polite"></section>
 
-    <button id="mapbtn" class="mapbtn">🗺️ ด่านทั้งหมด · การ์ดคำสั่ง</button>
+    <button id="mapbtn" class="mapbtn"><span data-ic="map"></span>ด่านทั้งหมด · การ์ดคำสั่ง</button>
     <div id="mappanel" class="mappanel" hidden>
-      <div class="mp-head"><b>🗺️ ด่านทั้งหมด · การ์ดคำสั่ง</b><button id="mapclose">✕ ปิด</button></div>
+      <div class="mp-head"><b><span data-ic="map"></span>ด่านทั้งหมด · การ์ดคำสั่ง</b><button id="mapclose"><span data-ic="x"></span>ปิด</button></div>
       <div class="mp-body">
       <div id="map"></div>
       <div class="label">ดูเนื้อเรื่องอีกครั้ง</div>
@@ -72,7 +72,7 @@
           <span class="wt-x"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></span>
         </div>
         <div class="wt-tab" id="pikitab" hidden title="Piki">
-          <span class="wt-icon">📘</span>
+          <span class="wt-icon" data-ic="book"></span>
           <span class="wt-title">Piki — สารานุกรมเสรี</span>
           <span class="wt-x" id="pikiclose" title="ปิดแท็บ"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></span>
         </div>

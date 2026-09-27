@@ -10,6 +10,10 @@ import { session, key, signOut } from './account.js';
 import { track } from './sync.js';
 import { CHECKPOINTS, runQuiz } from './quiz.js';
 import { PAGES as PIKI_PAGES, mountPiki, findPage } from './piki.js';
+import { icon } from './icons.js';
+
+// Static buttons in index.html mark where their icon goes with data-ic.
+document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = icon(el.dataset.ic); });
 
 const WHO = {
   lam: ['น้องล่าม', '🐧'], kru: ['ครูสมใจ', '👩‍🏫'], root: ['พี่รูท', '🧑‍💻'],
@@ -294,9 +298,9 @@ async function loadLevel(idx, { replay = false, reset = false } = {}) {
 // nobody translates any more.
 function pikiTip(lv) {
   const strict = STRICT.has(lv.phase);
-  const el = note(`📘 <b>Piki</b> คู่มือคำสั่งของเครื่องนี้ ${strict ? 'ต่อจากนี้ไม่มีใครแปลให้แล้ว ติดตรงไหนเปิดอ่านได้ ไม่หักดาว' : 'อยากรู้ละเอียดว่าคำสั่งไหนทำอะไร เปิดอ่านได้ ไม่หักดาว'}` +
-    `<br>เปิดได้ 3 ทาง: ปุ่ม <b>+</b> บนแถบแท็บ · ปุ่ม <b>📘 Piki</b> ใต้ภารกิจ · พิมพ์ <code>piki ชื่อคำสั่ง</code> เช่น <code>piki cd</code>` +
-    ` <button class="pkopen">เปิด Piki</button>`, 'sys pktip');
+  const el = note(`${icon('book')} <b>Piki</b> คู่มือคำสั่งของเครื่องนี้ ${strict ? 'ต่อจากนี้ไม่มีใครแปลให้แล้ว ติดตรงไหนเปิดอ่านได้ ไม่หักดาว' : 'อยากรู้ละเอียดว่าคำสั่งไหนทำอะไร เปิดอ่านได้ ไม่หักดาว'}` +
+    `<br>เปิดได้ 3 ทาง: ปุ่ม <b>+</b> บนแถบแท็บ · ปุ่ม <b>Piki</b> ใต้ภารกิจ · พิมพ์ <code>piki ชื่อคำสั่ง</code> เช่น <code>piki cd</code>` +
+    ` <button class="pkopen">${icon('book', 14)}เปิด Piki</button>`, 'sys pktip');
   el.querySelector('.pkopen').onclick = () => openPiki();
 }
 
@@ -328,7 +332,7 @@ async function openQuiz(cp, idx) {
   const q0 = progress.quiz[cp];
   $('#lvstars').textContent = q0 ? `สถิติ ${q0.best}/5` : '';
   $('#hint').disabled = true;
-  $('#hint').textContent = '💡 ไม่มีใบ้';
+  $('#hint').innerHTML = icon('bulb') + 'ไม่มีใบ้';
   $('#reset').disabled = true;
   $('#hintnote').textContent = '';
   $('#tabtitle').textContent = 'ป้าเซิร์ฟ: เช็กพอยต์ ' + cp;
@@ -857,9 +861,9 @@ function renderSide() {
   // Windows comparison + a link to the Piki page(s) this level introduces.
   const pages = PIKI_PAGES.filter(p => p.at === lv.id);
   $('#gui').hidden = !GUI[lv.id] && !pages.length;
-  $('#gui').innerHTML = (GUI[lv.id] ? '🖱️ ' + esc(GUI[lv.id]) : '') +
-    (pages.length ? `${GUI[lv.id] ? ' · ' : ''}📘 ${pages.map(p => `<a href="#" data-pk="${p.id}">${esc(p.title)}</a>`).join(', ')}` : '');
-  $('#gui').title = 'เทียบกับ Windows · 📘 = อ่านละเอียดใน Piki';
+  $('#gui').innerHTML = (GUI[lv.id] ? icon('mouse', 13) + esc(GUI[lv.id]) : '') +
+    (pages.length ? `${GUI[lv.id] ? ' · ' : ''}${icon('book', 13)}${pages.map(p => `<a href="#" data-pk="${p.id}">${esc(p.title)}</a>`).join(', ')}` : '');
+  $('#gui').title = 'เทียบกับ Windows · รูปหนังสือ = อ่านละเอียดใน Piki';
   $('#gui').querySelectorAll('[data-pk]').forEach(a => { a.onclick = e => { e.preventDefault(); openPiki(a.dataset.pk); }; });
   renderSteps();
   const best = progress.stars[lv.id] || 0;
@@ -867,7 +871,7 @@ function renderSide() {
   const hb = $('#hint');
   hb.disabled = L.passed || L.hint >= 3;
   // Short label; what the next hint costs goes in the tooltip (the panel was getting crowded).
-  hb.textContent = L.hint >= 3 ? '💡 ใบ้ครบแล้ว' : `💡 คำใบ้ ${L.hint + 1}/3`;
+  hb.innerHTML = icon('bulb') + (L.hint >= 3 ? 'ใบ้ครบแล้ว' : `คำใบ้ ${L.hint + 1}/3`);
   hb.title = ['ขั้น 1 ลุงภารโรง: คำสั่งที่อาจต้องใช้ (ไม่หักดาว)', 'ขั้น 2 สมุดน้องล่าม: ถอดรหัส error ล่าสุด (ดาวสูงสุดเหลือ 2)', 'ขั้น 3 พี่รูท: เฉลย (ดาวสูงสุดเหลือ 1)'][L.hint] || '';
   $('#hintnote').textContent = '';
 
