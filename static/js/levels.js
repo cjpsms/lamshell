@@ -777,20 +777,33 @@ const lamIntact = (fs, base) => fs.isFile(base + '/wake.sh') && MEMORY_NAMES.eve
 const LAM_HOME = '/opt/' + LAM;
 const LAM_PLACES = [LAM_HOME, `${Q}/${LAM}`, `${HOME}/${LAM}`];
 const lamBase = fs => LAM_PLACES.find(p => fs.isDir(p)) || null;
+// Her own files carry node.lamPart (it moves and copies with the node), so the game can tell a deleted brain from a
+// moved one. Deleting one for real (fs.root.lamGone) is final: she is never rebuilt on that machine.
+const tag = (fs, path, part) => { const n = fs.get(path); if (n && n.t === 'f') n.lamPart = part; };
+export function lamParts(fs) {
+  const found = new Set();
+  const walk = node => { for (const n of Object.values(node.kids)) { if (n.t === 'd') walk(n); else if (n.lamPart) found.add(n.lamPart); } };
+  walk(fs.root);
+  return found;
+}
+export function markLamGone(fs) { fs.root.lamGone = true; }
 function lamHome(fs) {
   fs.tree('/opt', { '__ro': true, [LAM + '/']: {
     '__ro': true,
     'wake.sh': { content: '#!/bin/bash\n# ปลุกน้องล่าม\ncheck brain/\nload language\nwake up', ro: true, x: true, prog: 'wake' },
     'brain/': { '__ro': true, 'damage.log': { content: 'บันทึกความเสียหายของน้องล่าม\n(ยังไม่มี สุขภาพดี 100%)', ro: true } },
   } });
+  tag(fs, LAM_HOME + '/wake.sh', 'wake.sh');
 }
 // Write the memories that exist by now into her brain, wherever she is. world.js calls it at every level start.
 export function syncBrain(fs, lv) {
+  if (fs.root.lamGone) return;
   const all = LEVELS.indexOf(lv) >= LEVELS.findIndex(l => l.id === 'R1');
   if (!lamBase(fs) && !all) lamHome(fs);   // a machine saved before she lived in /opt
   const base = lamBase(fs);
   if (!base) return;
-  for (const [n, text] of Object.entries(memories(all))) fs.write(brain(base) + '/' + n, text, { ro: true });
+  for (const [n, text] of Object.entries(memories(all))) { fs.write(brain(base) + '/' + n, text, { ro: true }); tag(fs, brain(base) + '/' + n, n); }
+  tag(fs, base + '/wake.sh', 'wake.sh');
 }
 // The virus's attacks, as น้องล่าม's own damage report.
 function bite(fs, line) {
@@ -803,6 +816,7 @@ function bite(fs, line) {
 }
 
 function quarantine(fs) {
+  if (fs.root.lamGone) return;   // deleted for good: nobody to lock away (the game ends before the rescue arc)
   if (!lamBase(fs)) lamHome(fs);   // someone removed her with sudo before the rescue arc: she is put back to be taken
   const q = { '__ro': true, 'README.txt': { content: 'ห้องกักกัน — ไวรัสมั่วซั่ว', ro: true }, 'gate/': { '__ro': true } };
   for (const p of TRAPS) {
@@ -814,7 +828,7 @@ function quarantine(fs) {
   const from = lamBase(fs);
   if (from !== `${Q}/${LAM}`) rename(fs, from, `${Q}/${LAM}`);   // the same folder the player could see in /opt
   const base = `${Q}/${LAM}`;
-  for (const [n, text] of Object.entries(memories(true))) fs.write(brain(base) + '/' + n, text, { ro: true });
+  for (const [n, text] of Object.entries(memories(true))) { fs.write(brain(base) + '/' + n, text, { ro: true }); tag(fs, brain(base) + '/' + n, n); }
   for (const n of BLOCK_NAMES) fs.write(brain(base) + '/' + n, '👾 block', { ro: true });
   bite(fs, 'ถูกลากไปขังใน /quarantine และโดนอุดสมองด้วยไฟล์ .block 5 ไฟล์');
 }

@@ -2,7 +2,7 @@ import { sizeOf } from './vfs.js';
 import { Shell } from './shell.js';
 import { decode } from './decoder.js';
 import { interpret, aiStatus, hasThai, fromKedmanee } from './translate.js';
-import { LEVELS, PHASES, STRICT, PHASE_ORDER, GUI, phaseLabel } from './levels.js';
+import { LEVELS, PHASES, STRICT, PHASE_ORDER, GUI, phaseLabel, lamParts, markLamGone } from './levels.js';
 import { isMuted, setMuted } from './voice.js';
 import { worldFor, saveWorld, levelStart, forgetWorld, keptFiles, restoreKept } from './world.js';
 import { logInput, clearJournal } from './journal.js';
@@ -128,6 +128,10 @@ function moodFor(who, text) {
   if (/หลง|ห้าม|ระวัง|พัง|ไม่ได้|ผิด|ช่วยด้วย|เต็ม|ด่วน/.test(text)) return 'surprised';
   return 'neutral';
 }
+
+// Deleting น้องล่าม's brain for real is game over (cj, 2026-09-28): the save is wiped and the game starts again.
+// progress.lamGone marks a game over not yet acknowledged (the tab was closed during the scene).
+const gone = () => !!progress.lamGone;
 
 function say(who, text, extraHtml = '', now = false) {
   const [name, icon] = WHO[who];
@@ -257,6 +261,7 @@ let loading = 0, building = false;
 async function loadLevel(idx, { replay = false, reset = false } = {}) {
   const lv = LEVELS[idx];
   quizOpen = false;
+  if (gone()) return gameOver();
   // The next phase opens only after its checkpoint quiz (only on the way forward: finished phases stay open).
   const cp = checkpointBefore(idx);
   if (cp && !progress.quiz[cp]?.passed && idx === progress.unlocked && !replay) return openQuiz(cp, idx);
@@ -557,6 +562,7 @@ async function runAndHelp(text) {
 
 async function run(line, translated = false) {
   const before = new Set(L.fs.allPaths());
+  const lamBefore = L.live ? lamParts(L.fs) : null;
   const res = await L.sh.exec(line);
   res.created = L.fs.allPaths().filter(p => !before.has(p));
   res.cwd = L.sh.cwd;
@@ -573,10 +579,62 @@ async function run(line, translated = false) {
     const names = back.map(p => p.split('/').pop()).join(', ');
     say('kru', `เดี๋ยวๆ! จะลบไฟล์งานของครูทำไมจ๊ะ (${names}) ครูกู้คืนจากสำรองให้แล้วนะ แต่เครื่องจริงลบแล้วหายเลย ระวังด้วย`);
   }
+  if (lamBefore) {
+    const now = lamParts(L.fs);
+    const lost = [...lamBefore].filter(p => !now.has(p));
+    if (lost.length) {
+      markLamGone(L.fs);
+      progress.lamGone = true;
+      save();
+      if (L.live) saveWorld(L.lv.id, L.fs);
+      track('lam_gone', { lv: L.lv.id, phase: L.lv.phase, cmd: line, lost });
+      await gameOver(line);
+      return res;
+    }
+  }
   if (L.live) saveWorld(L.lv.id, L.fs);
   checkLevel();
   renderSteps();
   return res;
+}
+
+// Short text-only scenes (no voice, no 3D) for losing her.
+async function captions(cls, lines, button) {
+  const ov = $('#overlay');
+  ov.className = 'overlay captions ' + cls + ' show';
+  ov.innerHTML = '';
+  for (const [html, ms] of lines) {
+    const d = document.createElement('div');
+    d.className = 'cap';
+    d.innerHTML = html;
+    ov.appendChild(d);
+    await sleep(ms);
+  }
+  const b = document.createElement('button');
+  b.className = 'capbtn';
+  b.textContent = button;
+  ov.appendChild(b);
+  b.focus();
+  await new Promise(res => { b.onclick = res; });
+  ov.className = 'overlay';
+  ov.innerHTML = '';
+}
+
+async function gameOver(cmd) {
+  ++loading;
+  stage?.clearQueue();
+  track('game_over', { lv: L?.lv.id, phase: L?.lv.phase, cmd: cmd || null });
+  await captions('lamgone', [
+    ...(cmd ? [[`<code>$ ${esc(cmd)}</code>`, 1600]] : []),
+    ['ไฟล์สมองของน้องล่ามถูกลบ', 2200],
+    ['<span class="small">rm ไม่มีถังขยะ ลบแล้วหายเลย</span>', 2000],
+    ['ไม่มีล่ามคอยขวางอีกแล้ว<br>ไวรัสมั่วซั่วยึดป้าเซิร์ฟได้ทั้งเครื่อง', 2800],
+    ['แล้วลามต่อไปทุกเครื่องในโลก', 2400],
+    ['ปี 2050 ไม่มีคอมเครื่องไหนเข้าใจคนอีกแล้ว<br>โลกไม่สงบสุขอีกต่อไป', 3000],
+    ['<b class="gameover">GAME OVER</b>', 1400],
+    ['<span class="small">บนเครื่องจริง อ่านให้ดีก่อนลบทุกครั้ง</span>', 600],
+  ], 'เริ่มใหม่ตั้งแต่ต้น');
+  resetAll();
 }
 
 function renderDecoder(stderr) {
@@ -944,13 +1002,16 @@ const showSound = () => {
 soundBtn.onclick = () => { setMuted(!isMuted()); showSound(); };
 showSound();
 $('#reset').onclick = () => L && loadLevel(L.idx, { replay: true, reset: true });
-$('#wipe').onclick = () => {
-  if (!confirm('ล้างความคืบหน้าทั้งหมด (ดาว/การ์ด) ใช่ไหม?')) return;
+function resetAll() {
   progress = { unlocked: 0, unlockedId: LEVELS[0].id, stars: {}, cards: [], seen: {}, quiz: {} };
   save();
   forgetWorld();
   clearJournal();
   loadLevel(0);
+}
+$('#wipe').onclick = () => {
+  if (!confirm('ล้างความคืบหน้าทั้งหมด (ดาว/การ์ด) ใช่ไหม?')) return;
+  resetAll();
 };
 
 (async () => {

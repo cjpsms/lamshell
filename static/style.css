@@ -233,6 +233,13 @@ aside { position: relative; }
 .overlay.show { display: flex; }
 .overlay.power { background: #000; color: var(--muted); }
 .overlay.wiped { background: #1c0606; color: var(--red); }
+.overlay.captions { background: #000; color: #ddd; font-size: 24px; gap: 18px; z-index: 30; }
+.overlay.captions .cap { animation: capin 1.2s ease both; max-width: 760px; line-height: 1.5; }
+.overlay.captions .gameover { font: 700 44px var(--mono); color: var(--c-red); letter-spacing: .08em; }
+.overlay.captions code { font: 18px var(--mono); color: var(--c-red); }
+.overlay.captions .capbtn { margin-top: 18px; background: none; border: 1px solid #555; color: #ddd; border-radius: 4px; padding: 6px 22px; font-size: 15px; animation: capin 1s ease both; }
+.overlay.captions .capbtn:hover { border-color: #aaa; }
+@keyframes capin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .overlay .small { font-size: 14px; color: var(--muted); line-height: 1.6; }
 
 @media (max-width: 900px) {
