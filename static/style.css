@@ -75,8 +75,10 @@ aside { background: var(--side); border-right: 1px solid var(--line); display: f
 .ai { color: var(--muted); }
 .ai.on { color: var(--green); }
 .ai.off { color: var(--red); }
-.soundbtn { background: none; border: 1px solid #3a3a3a; border-radius: 4px; padding: 1px 6px; font-size: 13px; line-height: 1.4; }
-.soundbtn:hover { background: #262626; }
+.soundbtn { background: none; border: 0; border-radius: 4px; width: 28px; height: 26px; display: grid; place-items: center; color: #d0d0d0; }
+.soundbtn:hover { background: #2d2d2d; color: #fff; }
+.soundbtn.off { color: #767676; }
+.soundbtn svg { display: block; }
 
 .level { padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .lvtop { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }

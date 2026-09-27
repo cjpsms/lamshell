@@ -927,7 +927,16 @@ $('#player').innerHTML = session
 $('#signout')?.addEventListener('click', signOut);
 $('#signin-btn')?.addEventListener('click', () => { try { localStorage.removeItem('lamshell.mode'); } catch {} location.reload(); });
 const soundBtn = $('#sound');
-const showSound = () => { soundBtn.textContent = isMuted() ? '🔇' : '🔊'; soundBtn.title = isMuted() ? 'เปิดเสียงพากย์' : 'ปิดเสียงพากย์'; };
+// Line icons (same stroke style as the window buttons), not emoji.
+const SPEAKER = '<path d="M2 6h2.5L8 3v10L4.5 10H2z" fill="currentColor" stroke="none"/>';
+const ICON_ON = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">${SPEAKER}<path d="M10.5 5.8a3 3 0 0 1 0 4.4"/><path d="M12.4 3.9a5.7 5.7 0 0 1 0 8.2"/></svg>`;
+const ICON_OFF = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round">${SPEAKER}<path d="M10.5 6l4 4M14.5 6l-4 4"/></svg>`;
+const showSound = () => {
+  soundBtn.innerHTML = isMuted() ? ICON_OFF : ICON_ON;
+  soundBtn.classList.toggle('off', isMuted());
+  soundBtn.title = isMuted() ? 'เปิดเสียงพากย์' : 'ปิดเสียงพากย์';
+  soundBtn.setAttribute('aria-label', soundBtn.title);
+};
 soundBtn.onclick = () => { setMuted(!isMuted()); showSound(); };
 showSound();
 $('#reset').onclick = () => L && loadLevel(L.idx, { replay: true, reset: true });
