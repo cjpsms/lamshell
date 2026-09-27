@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import urllib.parse
@@ -18,13 +19,12 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import classroom
+import settings
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 LOG_DIR = ROOT / "logs"
-PORT = int(os.environ.get("LAMSHELL_PORT", "4011"))
-# 127.0.0.1 by default. For a real classroom, LAMSHELL_HOST=0.0.0.0 lets the students' computers reach it.
-HOST = os.environ.get("LAMSHELL_HOST", "127.0.0.1")
+
 MODEL = "haiku"
 
 SYSTEM_PROMPT = """คุณคือ "น้องล่าม" ภูตเพนกวินตัวจิ๋วที่อาศัยอยู่ใน shell ของเครื่อง "ป้าเซิร์ฟ" ในเกมสอน Linux สำหรับนักเรียนมัธยมไทย
@@ -309,7 +309,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/health":
             return self.send_json({"ok": True, "ai": ai_available(), "model": MODEL})
         if path == "/api/teacher/status":
-            return self.send_json({"set": classroom.teacher_is_set(), "in": self.teacher()})
+            return self.send_json({"set": bool(settings.load().get("teacher")), "in": self.teacher()})
         if path == "/api/teacher/overview":
             if not self.teacher():
                 return self.send_json({"error": "login"}, 401)
@@ -319,9 +319,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "login"}, 401)
             buf = io.StringIO()
             w = csv.writer(buf)
-            w.writerow(["code", "name", "class", "seat", "time", "type", "level", "phase", "data"])
+            w.writerow(["code", "class", "seat", "time", "type", "level", "phase", "data"])
             for r in classroom.export_rows(klass):
-                w.writerow([*r[:4], time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(r[4] / 1000)), *r[5:]])
+                w.writerow([*r[:3], time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(r[3] / 1000)), *r[4:]])
             data = ("\ufeff" + buf.getvalue()).encode()   # BOM: Excel reads the Thai as UTF-8
             self.send_response(200)
             self.send_header("Content-Type", "text/csv; charset=utf-8")
@@ -341,8 +341,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(interpret(self.body()))
             if path == "/api/register":
                 req = self.body()
-                me = classroom.register(req.get("name"), req.get("class"), req.get("seat"), req.get("consent") is True)
-                return self.send_json(me) if me else self.send_json({"error": "กรอกชื่อ ชั้น เลขที่ และกดยอมรับก่อน"}, 400)
+                me = classroom.register(req.get("class"), req.get("seat"), req.get("consent") is True)
+                return self.send_json(me) if me else self.send_json({"error": "กรอกชั้น เลขที่ และกดยอมรับก่อน"}, 400)
             if path == "/api/login":
                 me = classroom.login(self.body().get("code"))
                 return self.send_json(me) if me else self.send_json({"error": "ไม่พบผู้เล่นนี้"}, 404)
@@ -356,9 +356,6 @@ class Handler(SimpleHTTPRequestHandler):
                 code = classroom.norm_code(req.get("code"))
                 n = classroom.add_events(code, req.get("events") or []) if code else 0
                 return self.send_json({"ok": True, "n": n})
-            if path == "/api/teacher/setup":
-                tok = classroom.teacher_setup(self.body().get("password"))
-                return self.set_session(tok, {"ok": True}) if tok else self.send_json({"error": "ตั้งรหัสไม่ได้"}, 400)
             if path == "/api/teacher/login":
                 tok = classroom.teacher_login(self.body().get("password"))
                 return self.set_session(tok, {"ok": True}) if tok else self.send_json({"error": "รหัสผ่านไม่ถูกต้อง"}, 401)
@@ -379,8 +376,18 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
-    srv = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"LamShell on http://{HOST}:{PORT}  (AI: {MODEL}, claude CLI found={ai_available()})", flush=True)
+    if "--setup" in sys.argv or (not settings.exists() and sys.stdin.isatty()):
+        if settings.setup():
+            classroom.end_all_sessions()
+        if "--setup" in sys.argv:
+            return
+    cfg = settings.load()
+    if not cfg.get("teacher"):
+        print("ยังไม่ได้ตั้งรหัสครู: หน้าครูจะเข้าไม่ได้จนกว่าจะรัน  python3 server.py --setup", flush=True)
+    host, port = cfg["host"], cfg["port"]
+    srv = ThreadingHTTPServer((host, port), Handler)
+    lan = f"  นักเรียนเข้าที่ http://{settings.lan_ip()}:{port}/" if host == "0.0.0.0" and settings.lan_ip() else ""
+    print(f"LamShell on http://{host}:{port}{lan}  (AI: {MODEL}, claude CLI found={ai_available()})", flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

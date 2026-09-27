@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # Start the LamShell server if it isn't running, then open the game in the browser.
+#   lamshell           start (the first time: asks for the settings in this terminal)
+#   lamshell --setup   change the settings (teacher password, classroom network, port)
 DIR="$(dirname "$(readlink -f "$0")")"
-URL=http://127.0.0.1:4011/
+if [ "$1" = "--setup" ] || [ ! -f "$DIR/config.json" ]; then
+  python3 "$DIR/server.py" --setup || exit 1
+  [ "$1" = "--setup" ] && echo "ถ้าเซิร์ฟเวอร์รันอยู่ ให้ปิดแล้วเปิดใหม่เพื่อใช้ค่าใหม่ (พอร์ต/เครือข่าย)" && exit 0
+fi
+PORT=$(python3 -c "import sys; sys.path.insert(0, '$DIR'); import settings; print(settings.load()['port'])")
+URL=http://127.0.0.1:$PORT/
 if ! curl -s -o /dev/null "$URL/api/health"; then
   setsid nohup python3 "$DIR/server.py" >"$DIR/server.log" 2>&1 &
   for _ in $(seq 20); do curl -s -o /dev/null "$URL/api/health" && break; sleep 0.2; done
 fi
 xdg-open "$URL" >/dev/null 2>&1 &
-echo "LamShell: $URL"
+echo "LamShell: $URL   หน้าครู: ${URL}teacher"

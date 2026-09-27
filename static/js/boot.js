@@ -1,4 +1,5 @@
-// First screen: sign in (real name + class + seat, and agree to data collection) or play as a guest.
+// First screen: sign in (class + seat, no name; agree to data collection) or play as a guest. Signing in shows the
+// player's code, which the teacher matches to a name on their own list (names never enter the system).
 // It runs before anything else loads, because every save key depends on who is playing (account.js).
 // After signing in on a new computer, the save from the server is put in place before the game reads it.
 const $ = s => document.querySelector(s);
@@ -20,8 +21,9 @@ async function signIn(body) {
   const me = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(me.error || 'เข้าสู่ระบบไม่สำเร็จ');
   useServerSave(me);
-  put(SESSION, JSON.stringify({ code: me.code, name: me.name, class: me.class, seat: me.seat }));
+  put(SESSION, JSON.stringify({ code: me.code, class: me.class, seat: me.seat }));
   put(MODE, 'student');
+  return me;
 }
 
 function show() {
@@ -29,18 +31,22 @@ function show() {
   box.hidden = false;
   const f = box.querySelector('form');
   const err = box.querySelector('.err');
-  const ok = () => { f.go.disabled = !(f.name.value.trim() && f.klass.value.trim() && f.seat.value.trim() && f.consent.checked); };
+  const ok = () => { f.go.disabled = !(f.klass.value.trim() && f.seat.value.trim() && f.consent.checked); };
   f.addEventListener('input', ok);
   ok();
-  f.name.focus();
+  f.klass.focus();
   f.addEventListener('submit', async e => {
     e.preventDefault();
     err.textContent = '';
     f.go.disabled = true;
     try {
-      await signIn({ name: f.name.value, class: f.klass.value, seat: f.seat.value, consent: f.consent.checked });
-      box.hidden = true;
-      start();
+      const me = await signIn({ class: f.klass.value, seat: f.seat.value, consent: f.consent.checked });
+      const card = box.querySelector('.si-code');
+      f.hidden = true;
+      card.hidden = false;
+      card.querySelector('.code').textContent = me.code;
+      card.querySelector('.go').focus();
+      card.querySelector('.go').onclick = () => { box.hidden = true; start(); };
     } catch (x) {
       err.textContent = x.message === 'Failed to fetch' ? 'ติดต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง หรือเล่นแบบไม่บันทึก' : x.message;
       ok();

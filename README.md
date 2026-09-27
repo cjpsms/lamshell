@@ -59,18 +59,22 @@ who uses a Gemini voice.
 
 ## Classroom
 
-- **Sign in**: students type their real name, class and seat number and tick the consent box (what gets collected
-  and why) before playing. The same three on another computer continue the same save (kept on the server). A
+- **Sign in**: students type only their class and seat number and tick the consent box (what gets collected and
+  why); no names are stored. They get a player code (e.g. `TQ-7F3K`), and the teacher matches codes to names on
+  their own list. The same class + seat on another computer continues the same save (kept on the server). A
   "play without saving" guest mode sends nothing.
 - **Checkpoint quizzes** (`static/js/quiz.js`): after phases 1–4, ป้าเซิร์ฟ (the school server herself) asks
   5 questions drawn from a bank (what a command does, what a real error means). 4/5 (80%) opens the next phase;
   retries draw new questions.
-- **Teacher dashboard** at `/teacher` (password set on first visit): progress per student with anyone stuck on one
+- **Teacher dashboard** at `/teacher`: progress per student with anyone stuck on one
   level over 5 minutes flagged, slowest levels, the class's most common errors, Thai น้องล่าม couldn't translate,
   quiz results per question, research indicators (repeated-error rate, AI reliance, decoder use, look before
   delete), and a CSV export of every event.
-- Data lives in `data/lamshell.db` (SQLite, gitignored). For a real classroom run the server with
-  `LAMSHELL_HOST=0.0.0.0` so the students' computers can reach it.
+- **Settings are made in the terminal**, never on the web: the first `./lamshell` (or `python3 server.py`) asks
+  for the teacher password, whether students' computers may connect over the network, and the port, and writes
+  `config.json` (chmod 600, gitignored; the password only as a PBKDF2 hash). Change them later with
+  `./lamshell --setup`. `LAMSHELL_HOST` / `LAMSHELL_PORT` still override.
+- Play data lives in `data/lamshell.db` (SQLite, gitignored).
 
 ## Not done yet
 

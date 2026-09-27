@@ -8,3 +8,4 @@ docs/
 tools/voices/voice_ids.json
 tools/voices/raw/
 data/
+config.json

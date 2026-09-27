@@ -858,7 +858,7 @@ function renderSide() {
 $('#hint').onclick = useHint;
 // Who is playing, top of the side panel.
 $('#player').innerHTML = session
-  ? `👤 <b>${esc(session.name)}</b> ${esc(session.class)} เลขที่ ${esc(session.seat)}<button class="linkbtn" id="signout">ออกจากระบบ</button>`
+  ? `👤 <b>${esc(session.class)} เลขที่ ${esc(session.seat)}</b> รหัส ${esc(session.code)}<button class="linkbtn" id="signout">ออกจากระบบ</button>`
   : `เล่นแบบไม่บันทึก<button class="linkbtn" id="signin-btn">ลงชื่อเข้าเล่น</button>`;
 $('#signout')?.addEventListener('click', signOut);
 $('#signin-btn')?.addEventListener('click', () => { try { localStorage.removeItem('lamshell.mode'); } catch {} location.reload(); });

@@ -1,13 +1,13 @@
 """Classroom side of LamShell: student codes, saved progress, play events, and the teacher dashboard's numbers.
 
-Stdlib only (sqlite3). Students sign in themselves with their real name, class and seat number, and must tick the consent box first
-(cj's call, 2026-09-27); the time they agreed is kept. Internally each student is a random code like TQ-7F3K.
+Stdlib only (sqlite3). No names are stored (PDPA, the players are minors): a student signs in with class + seat
+number and ticks the consent box, and gets a code like TQ-7F3K. The teacher matches codes to names on their own
+list, outside the system. The teacher password lives hashed in config.json (settings.py), set in the terminal.
 
 Tables
-  students(code, name, class, seat, created, last_seen, consent)
+  students(code, class, seat, created, last_seen, consent)
   state(code, data, updated)          -- the browser's save (progress + machine + journal), newest wins
   events(code, ts, type, level, phase, data)   -- one row per thing that happened in play, for research
-  teacher(k, v)                       -- password hash + salt
   sessions(token, created)            -- teacher logins
 """
 import hashlib
@@ -18,6 +18,8 @@ import sqlite3
 import statistics
 import threading
 import time
+
+import settings
 from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parent / "data" / "lamshell.db"
@@ -39,14 +41,13 @@ def db():
         _db.row_factory = sqlite3.Row
         _db.executescript("""
             PRAGMA journal_mode=WAL;
-            CREATE TABLE IF NOT EXISTS students (code TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
+            CREATE TABLE IF NOT EXISTS students (code TEXT PRIMARY KEY,
                 class TEXT NOT NULL DEFAULT '', seat TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL,
                 last_seen INTEGER, consent INTEGER);
             CREATE TABLE IF NOT EXISTS state (code TEXT PRIMARY KEY, data TEXT NOT NULL, updated INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, code TEXT NOT NULL, ts INTEGER NOT NULL,
                 type TEXT NOT NULL, level TEXT, phase TEXT, data TEXT NOT NULL DEFAULT '{}');
             CREATE INDEX IF NOT EXISTS events_code_ts ON events(code, ts);
-            CREATE TABLE IF NOT EXISTS teacher (k TEXT PRIMARY KEY, v TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, created INTEGER NOT NULL);
         """)
     return _db
@@ -69,14 +70,14 @@ def clean(s, n):
     return re.sub(r"\s+", " ", str(s or "")).strip()[:n]
 
 
-def register(name, klass, seat, consent):
-    """Sign in by name + class + seat. The same three again (on any computer) finds the same student."""
-    name, klass, seat = clean(name, 80), clean(klass, 20), clean(seat, 4)
-    if not name or not klass or not seat or not consent:
+def register(klass, seat, consent):
+    """Sign in by class + seat. The same two again (on any computer) find the same student."""
+    klass, seat = clean(klass, 20).replace(" ", ""), clean(seat, 4).lstrip("0")
+    if not klass or not seat or not consent:
         return None
     t = now_ms()
     with _lock:
-        row = db().execute("SELECT * FROM students WHERE name=? AND class=? AND seat=?", (name, klass, seat)).fetchone()
+        row = db().execute("SELECT * FROM students WHERE class=? AND seat=?", (klass, seat)).fetchone()
         if row:
             code = row["code"]
             db().execute("UPDATE students SET last_seen=?, consent=COALESCE(consent, ?) WHERE code=?", (t, t, code))
@@ -85,8 +86,8 @@ def register(name, klass, seat, consent):
                 code = "TQ-" + "".join(secrets.choice(ALPHABET) for _ in range(4))
                 if not db().execute("SELECT 1 FROM students WHERE code=?", (code,)).fetchone():
                     break
-            db().execute("INSERT INTO students(code, name, class, seat, created, last_seen, consent) VALUES(?,?,?,?,?,?,?)",
-                         (code, name, klass, seat, t, t, t))
+            db().execute("INSERT INTO students(code, class, seat, created, last_seen, consent) VALUES(?,?,?,?,?,?)",
+                         (code, klass, seat, t, t, t))
         db().commit()
     return login(code)
 
@@ -102,7 +103,7 @@ def login(code):
         db().execute("UPDATE students SET last_seen=? WHERE code=?", (now_ms(), code))
         db().commit()
         st = db().execute("SELECT data, updated FROM state WHERE code=?", (code,)).fetchone()
-    return {"code": code, "name": row["name"], "class": row["class"], "seat": row["seat"],
+    return {"code": code, "class": row["class"], "seat": row["seat"],
             "state": json.loads(st["data"]) if st else None, "updated": st["updated"] if st else 0}
 
 
@@ -150,31 +151,8 @@ def delete_code(code):
 
 # ---------------- teacher auth ----------------
 
-def _hash(pw, salt):
-    return hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), 200_000).hex()
-
-
-def teacher_is_set():
-    with _lock:
-        return db().execute("SELECT 1 FROM teacher WHERE k='hash'").fetchone() is not None
-
-
-def teacher_setup(pw):
-    if teacher_is_set() or len(pw or "") < 6:
-        return None
-    salt = secrets.token_hex(16)
-    with _lock:
-        db().executemany("INSERT INTO teacher(k, v) VALUES(?,?)", [("salt", salt), ("hash", _hash(pw, salt))])
-        db().commit()
-    return new_session()
-
-
 def teacher_login(pw):
-    with _lock:
-        rows = dict(db().execute("SELECT k, v FROM teacher").fetchall())
-    if "hash" not in rows or not secrets.compare_digest(_hash(pw or "", rows["salt"]), rows["hash"]):
-        return None
-    return new_session()
+    return new_session() if settings.check_password(pw) else None
 
 
 def new_session():
@@ -191,6 +169,13 @@ def session_ok(tok):
     with _lock:
         row = db().execute("SELECT created FROM sessions WHERE token=?", (tok,)).fetchone()
     return bool(row) and now_ms() - row["created"] < SESSION_DAYS * 86400_000
+
+
+def end_all_sessions():
+    """After the password changes in setup, every teacher browser has to sign in again."""
+    with _lock:
+        db().execute("DELETE FROM sessions")
+        db().commit()
 
 
 def end_session(tok):
@@ -390,7 +375,7 @@ def export_rows(klass=None):
     """Every event as flat rows (for Excel / SPSS)."""
     with _lock:
         rows = db().execute(
-            "SELECT e.code, s.name, s.class, s.seat, e.ts, e.type, e.level, e.phase, e.data FROM events e "
+            "SELECT e.code, s.class, s.seat, e.ts, e.type, e.level, e.phase, e.data FROM events e "
             "JOIN students s ON s.code=e.code" + (" WHERE s.class=?" if klass else "") + " ORDER BY e.code, e.ts, e.id",
             (klass,) if klass else ()).fetchall()
     return rows

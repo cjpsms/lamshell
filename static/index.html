@@ -87,23 +87,29 @@
 <div id="signin" class="signin" hidden>
   <form autocomplete="off">
     <div class="si-title">🐧 ล่ามเชลล์</div>
-    <div class="muted">ลงชื่อก่อนเล่น ความคืบหน้าจะถูกบันทึกไว้ เล่นต่อจากเครื่องไหนก็ได้</div>
-    <label>ชื่อ-นามสกุล<input name="name" maxlength="80" placeholder="เช่น สมชาย ใจดี"></label>
+    <div class="muted">กรอกชั้นกับเลขที่ ไม่ต้องใส่ชื่อ ความคืบหน้าจะถูกบันทึกไว้ เล่นต่อจากเครื่องไหนก็ได้</div>
     <div class="si-row">
       <label>ชั้น<input name="klass" maxlength="20" placeholder="เช่น ม.4/2"></label>
       <label>เลขที่<input name="seat" maxlength="4" inputmode="numeric" placeholder="เช่น 12"></label>
     </div>
     <div class="consent">
       <b>การเก็บข้อมูล</b>
-      <p>เกมนี้เป็นส่วนหนึ่งของโครงงานวิจัย ระบบจะเก็บ ชื่อ ชั้น เลขที่ สิ่งที่พิมพ์ในเกม ข้อความ error ที่เจอ คำใบ้ที่ใช้
-      เวลาที่ใช้ในแต่ละด่าน และคะแนนแบบทดสอบ เพื่อให้ครูดูความคืบหน้า และนำไปวิเคราะห์ผลการเรียนรู้
-      ข้อมูลเก็บไว้ในเซิร์ฟเวอร์ของโรงเรียน/ผู้วิจัยเท่านั้น ไม่เผยแพร่ชื่อ และขอลบได้ทุกเมื่อโดยแจ้งครู</p>
+      <p>เกมนี้เป็นส่วนหนึ่งของโครงงานวิจัย ระบบ<b>ไม่เก็บชื่อ</b> เก็บแค่ ชั้น เลขที่ สิ่งที่พิมพ์ในเกม ข้อความ error ที่เจอ
+      คำใบ้ที่ใช้ เวลาที่ใช้ในแต่ละด่าน และคะแนนแบบทดสอบ ภายใต้รหัสผู้เล่น (เช่น TQ-7F3K) เพื่อให้ครูดูความคืบหน้า
+      และนำไปวิเคราะห์ผลการเรียนรู้ ข้อมูลเก็บไว้ในเครื่องของครู/ผู้วิจัยเท่านั้น และขอลบได้ทุกเมื่อโดยแจ้งครู</p>
       <label class="chk"><input type="checkbox" name="consent"> ฉันอ่านแล้วและยอมรับให้เก็บข้อมูลตามนี้</label>
     </div>
     <div class="err"></div>
     <button name="go" class="go">เข้าเล่น</button>
     <button type="button" class="guest linkbtn">เล่นแบบไม่บันทึก (ไม่ส่งข้อมูลใดๆ)</button>
   </form>
+  <div class="si-code" hidden>
+    <div class="si-title">🐧 ล่ามเชลล์</div>
+    <div class="muted">รหัสผู้เล่นของเธอคือ</div>
+    <div class="code"></div>
+    <div class="muted">จดไว้ หรือบอกครูถ้าครูขอ (ครูใช้รหัสนี้ดูความคืบหน้า)<br>เล่นต่อเครื่องอื่น: กรอกชั้นกับเลขที่เดิมได้เลย</div>
+    <button class="go">เริ่มเล่น</button>
+  </div>
 </div>
 <script type="module" src="js/boot.js"></script>
 </body>

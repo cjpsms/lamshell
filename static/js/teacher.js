@@ -28,16 +28,18 @@ async function auth() {
   if (st.in) return start();
   const box = $('#auth'), f = box.querySelector('form');
   box.hidden = false;
-  const setup = !st.set;
-  $('#authmsg').textContent = setup ? 'ครั้งแรก: ตั้งรหัสผ่านครู (อย่างน้อย 6 ตัว) รหัสนี้ใช้เข้าหน้านี้ครั้งต่อไป' : 'ใส่รหัสผ่านครู';
-  f.pw2.hidden = !setup;
-  f.querySelector('button').textContent = setup ? 'ตั้งรหัสและเข้าสู่ระบบ' : 'เข้าสู่ระบบ';
+  if (!st.set) {   // the password is only ever set in the terminal, on the teacher's machine
+    $('#authmsg').innerHTML = 'ยังไม่ได้ตั้งรหัสผ่านครู ตั้งได้ที่เครื่องที่รันเซิร์ฟเวอร์ ด้วยคำสั่ง<br><code>lamshell --setup</code> (หรือ <code>python3 server.py --setup</code>) แล้วโหลดหน้านี้ใหม่';
+    f.pw.hidden = true;
+    f.querySelector('button').hidden = true;
+    return;
+  }
+  $('#authmsg').textContent = 'ใส่รหัสผ่านครู';
   f.pw.focus();
   f.onsubmit = async e => {
     e.preventDefault();
     const err = f.querySelector('.err');
-    if (setup && f.pw.value !== f.pw2.value) { err.textContent = 'รหัสสองช่องไม่ตรงกัน'; return; }
-    const r = await api(setup ? 'setup' : 'login', { password: f.pw.value });
+    const r = await api('login', { password: f.pw.value });
     if (!r.ok) { err.textContent = r.data.error || 'เข้าสู่ระบบไม่ได้'; return; }
     box.hidden = true;
     start();
@@ -86,21 +88,21 @@ function render() {
 // ---------- tabs ----------
 function people() {
   const S = data.students;
-  if (!S.length) return '<div class="empty">ยังไม่มีนักเรียนลงชื่อเข้าเล่น (นักเรียนลงชื่อเองได้ที่หน้าเกม)</div>';
+  if (!S.length) return '<div class="empty">ยังไม่มีนักเรียนลงชื่อเข้าเล่น (นักเรียนกรอกชั้น + เลขที่เองได้ที่หน้าเกม)</div>';
   const stuck = S.filter(s => s.stuck);
   const cps = Object.keys(CHECKPOINTS);
   const rows = S.map(s => `<tr class="${s.stuck ? 'stuck' : ''}">
-    <td><span class="dot ${s.online ? 'on' : ''}"></span>${esc(s.class)}</td><td>${esc(s.seat)}</td><td>${esc(s.name)}</td>
+    <td><span class="dot ${s.online ? 'on' : ''}"></span>${esc(s.class)}</td><td>${esc(s.seat)}</td><td class="mono">${esc(s.code)}</td>
     <td>${esc(lvName(s.current))}${s.stuck ? ` <span class="tag red">ติด ${mins(s.on_level_ms)}</span>` : s.on_level_ms != null && s.online ? ` <span class="muted">${mins(s.on_level_ms)}</span>` : ''}</td>
     <td>${esc(s.front || '-')}</td><td>★ ${s.stars}</td>
     ${cps.map(c => { const q = s.quiz[c]; return `<td>${q ? `<span class="tag ${q.passed ? 'green' : 'amber'}">${q.best}/${q.total}</span> <span class="muted">${q.tries} รอบ</span>` : '<span class="muted">-</span>'}</td>`; }).join('')}
     <td>${s.inputs}</td><td class="muted">${ago(s.last, data.now)}</td>
-    <td><button class="del" title="ลบข้อมูลนักเรียนคนนี้" data-code="${esc(s.code)}" data-name="${esc(s.name)}">🗑</button></td></tr>`).join('');
+    <td><button class="del" title="ลบข้อมูลนักเรียนคนนี้" data-code="${esc(s.code)}" data-name="${esc(s.class + ' เลขที่ ' + s.seat)}">🗑</button></td></tr>`).join('');
   return `${stuck.length ? `<h2>🚨 ติดด่านเดิมเกิน 5 นาที (${stuck.length} คน) ครูไปช่วยได้เลย</h2>
-    <p class="note">${stuck.map(s => `<b>${esc(s.name)}</b> (${esc(s.class)} เลขที่ ${esc(s.seat)}) ด่าน ${esc(lvName(s.current))}`).join(' · ')}</p>` : ''}
+    <p class="note">${stuck.map(s => `<b>${esc(s.class)} เลขที่ ${esc(s.seat)}</b> (${esc(s.code)}) ด่าน ${esc(lvName(s.current))}`).join(' · ')}</p>` : ''}
     <h2>ความคืบหน้ารายคน (${S.length} คน)</h2>
-    <p class="note">ด่านที่เปิดอยู่ = ด่านที่กำลังเล่นตอนนี้ · ไกลสุด = ด่านที่ปลดล็อกไกลที่สุด · จุดเขียว = ออนไลน์ภายใน 3 นาที</p>
-    <div class="tbl"><table><tr><th>ชั้น</th><th>เลขที่</th><th>ชื่อ</th><th>ด่านที่เปิดอยู่</th><th>ไกลสุด</th><th>ดาว</th>
+    <p class="note">ระบบไม่เก็บชื่อ จับคู่รหัส/เลขที่กับชื่อนักเรียนในรายชื่อของครูเอง · ด่านที่เปิดอยู่ = ด่านที่กำลังเล่นตอนนี้ · ไกลสุด = ด่านที่ปลดล็อกไกลที่สุด · จุดเขียว = ออนไลน์ภายใน 3 นาที</p>
+    <div class="tbl"><table><tr><th>ชั้น</th><th>เลขที่</th><th>รหัส</th><th>ด่านที่เปิดอยู่</th><th>ไกลสุด</th><th>ดาว</th>
     ${cps.map(c => `<th>เช็กพอยต์ ${c}</th>`).join('')}<th>พิมพ์ไป</th><th>ล่าสุด</th><th></th></tr>${rows}</table></div>`;
 }
 
