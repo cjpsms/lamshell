@@ -1,5 +1,5 @@
 // First screen: sign in (name + class + seat, agree to data collection) or play as a guest.
-// The server matches the name against the teacher's class list (>= 90% similar, name only): on the list -> play;
+// The server matches the name against the teacher's class list (exact, name only): on the list -> play;
 // not on it -> wait here until the teacher approves (polls every 3 s, survives a reload).
 // It runs before anything else loads, because every save key depends on who is playing (account.js).
 // After signing in on a new computer, the save from the server is put in place before the game reads it.
