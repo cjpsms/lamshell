@@ -124,15 +124,15 @@ def roster_match(name, klass="", seat=""):
     """Best class-list entry for this name (>= MATCH), preferring the class/seat the student typed."""
     with _lock:
         rows = db().execute("SELECT class, seat, name FROM roster").fetchall()
-    best, score = None, 0.0
+    ranked = []
     for r in rows:
         sc = similar(name, r["name"])
-        if sc < MATCH:
-            continue
-        rank = sc + (0.01 if r["class"] == klass else 0) + (0.005 if r["seat"] == seat else 0)
-        if rank > score:
-            best, score = dict(r), rank
-    return best
+        if sc >= MATCH:
+            ranked.append((sc + (0.01 if r["class"] == klass else 0) + (0.005 if r["seat"] == seat else 0), dict(r)))
+    ranked.sort(key=lambda x: -x[0])
+    if len(ranked) > 1 and abs(ranked[0][0] - ranked[1][0]) < 1e-9:
+        return None   # two list names equally close (สมชาม: สมชาย or สมชาญ?) -> let the teacher decide
+    return ranked[0][1] if ranked else None
 
 
 def roster_size():
