@@ -148,7 +148,7 @@ function people() {
     <td>${s.inputs}</td><td class="muted">${ago(s.last, data.now)}</td>
     <td><button class="del" title="ลบข้อมูลนักเรียนคนนี้" data-code="${esc(s.code)}" data-name="${esc(s.name + ' ' + place(s))}">🗑</button></td></tr>`).join('');
   return `${waiting.length ? `<div class="waiting"><h2>✋ รอครูกดยอมรับ (${waiting.length} คน)</h2>
-    <p class="note">ชื่อที่พิมพ์ไม่ตรงกับรายชื่อนักเรียน (ต่ำกว่า 90%) ดูว่าเป็นนักเรียนจริงไหม แล้วกดยอมรับ</p>
+    <p class="note">ชื่อที่พิมพ์ไม่ตรงกับรายชื่อนักเรียน (ผิดเกินที่ยอมให้) ดูว่าเป็นนักเรียนจริงไหม แล้วกดยอมรับ</p>
     <div class="tbl"><table><tr><th>ชื่อที่พิมพ์</th><th>ชั้น</th><th>เลขที่</th><th>ในรายชื่อ เลขที่นี้คือ</th><th>เมื่อ</th><th></th></tr>
     ${waiting.map(s => `<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.class)}</td><td>${esc(s.seat)}</td>
       <td class="muted">${esc(data.roster?.[s.class]?.missing.find(m => m.seat === s.seat)?.name || '-')}</td><td class="muted">${ago(s.last_seen, data.now)}</td>

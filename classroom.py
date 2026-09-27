@@ -1,8 +1,9 @@
 """Classroom side of LamShell: student codes, saved progress, play events, and the teacher dashboard's numbers.
 
 Stdlib only (sqlite3). Sign-in (cj, 2026-09-27): the student types name + class + seat and ticks the consent box.
-The name is matched against the teacher's class list (uploaded from Excel): same name, or >= 90% similar, looking
-at the name only (prefixes like นาย/ด.ญ. and spaces ignored) -> in, as that list entry. Not on the list -> waits
+The name is matched against the teacher's class list (uploaded from Excel): same name, or a few typos off (the
+number allowed grows with the name's length, see allowed_edits), looking at the name only (prefixes like
+นาย/ด.ญ. and spaces ignored) -> in, as that list entry. Not on the list -> waits
 until the teacher approves them on the dashboard. No list uploaded yet -> everyone gets in.
 The teacher password lives hashed in config.json (settings.py), set in the terminal.
 
@@ -13,7 +14,6 @@ Tables
   events(code, ts, type, level, phase, data)   -- one row per thing that happened in play, for research
   sessions(token, created)            -- teacher logins
 """
-import difflib
 import hashlib
 import json
 import re
@@ -76,7 +76,7 @@ def clean(s, n):
     return re.sub(r"\s+", " ", str(s or "")).strip()[:n]
 
 
-MATCH = 0.9
+MATCH = 0.9   # similar() maps "within the allowed number of typos" to >= this
 PREFIX = re.compile(r"^(นางสาว|นาง|นาย|เด็กชาย|เด็กหญิง|ด\.?\s?ช\.?|ด\.?\s?ญ\.?|น\.?\s?ส\.?|mrs?\.?|ms\.?|miss)\s*", re.I)
 
 
@@ -94,9 +94,30 @@ def name_key(name):
     return re.sub(r"[\s\u200b]+", "", PREFIX.sub("", clean(name, 120))).lower()
 
 
+def edits(a, b):
+    """Levenshtein distance: letters to add, remove or change to turn a into b."""
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def allowed_edits(n):
+    """How many wrong letters a name of n letters may have: about 10%, rounded half up, never less than 1.
+    (cj: "ตามความยาวชื่อไดนามิก" -- a fixed 90% refused one typo in short names.)"""
+    return max(1, int(n * 0.1 + 0.5))
+
+
 def similar(a, b):
+    """1.0 = same name. >= MATCH when the typo count is within what the list name's length allows."""
     a, b = name_key(a), name_key(b)
-    return difflib.SequenceMatcher(None, a, b).ratio() if a and b else 0.0
+    if not a or not b:
+        return 0.0
+    d = edits(a, b)
+    return 1.0 if d == 0 else (MATCH + (1 - MATCH) * (1 - d / (allowed_edits(len(b)) + 1)) if d <= allowed_edits(len(b)) else 0.0)
 
 
 def roster_match(name, klass="", seat=""):

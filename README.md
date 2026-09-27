@@ -62,7 +62,7 @@ who uses a Gemini voice.
 - **Sign in**: students type name, class and seat number and tick the consent box (what gets collected and why).
   The teacher uploads the class list on the dashboard (📋 รายชื่อนักเรียน: Excel .xlsx or CSV with ชั้น / เลขที่ /
   ชื่อ [/ นามสกุล], or one sheet per class; read in the browser with no library, `static/js/roster.js`). The name
-  is matched against it, name only, ignoring titles like นาย/ด.ญ. and spaces: same or >= 90% similar -> straight in
+  is matched against it, name only, ignoring titles like นาย/ด.ญ. and spaces: same, or within a typo allowance that grows with the name's length (~10% of its letters, at least 1) -> straight in
   as that list entry; not on the list -> waits until the teacher presses ยอมรับ; no list uploaded -> everyone gets in.
   The same name on another computer continues the same save (kept on the server). A "play without saving" guest
   mode sends nothing.
