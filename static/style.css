@@ -173,7 +173,11 @@ mark { background: #4a3a14; color: var(--c-yellow); padding: 0 2px; }
 .stage { min-width: 0; min-height: 0; display: flex; padding: 16px; }
 .wt { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--wt-bg); border: 1px solid var(--wt-border); border-radius: 8px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, .5); font-family: var(--ui); }
 .wt-bar { display: flex; align-items: flex-end; height: 40px; background: var(--wt-chrome); color: #fff; font-size: 12px; user-select: none; flex: none; }
-.wt-tab { display: flex; align-items: center; gap: 10px; height: 32px; min-width: 200px; max-width: 320px; margin-left: 8px; padding: 0 8px 0 12px; background: var(--wt-bg); border-radius: 8px 8px 0 0; }
+.wt-tab { display: flex; align-items: center; gap: 10px; height: 32px; min-width: 200px; max-width: 320px; margin-left: 8px; padding: 0 8px 0 12px; background: transparent; border-radius: 8px 8px 0 0; cursor: default; }
+.wt-tab.on { background: var(--wt-bg); }
+.wt-tab:not(.on):hover { background: var(--wt-tab-hover); }
+.wt-tab[hidden] { display: none; }
+#pikiplus { cursor: pointer; }
 .wt-icon { font-size: 14px; line-height: 1; }
 .wt-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wt-x { width: 22px; height: 22px; display: grid; place-items: center; font-size: 10px; border-radius: 4px; color: #d0d0d0; }
@@ -319,3 +323,45 @@ mark { background: #4a3a14; color: var(--c-yellow); padding: 0 2px; }
 .gui[hidden] { display: none; }
 .who-serv .who { color: var(--c-cyan); }
 .cast-name.who-serv { color: var(--c-cyan); }
+
+/* ================= Piki: a Wikipedia parody, opened as a tab in the terminal window ================= */
+.pikiwrap { position: absolute; inset: 0; z-index: 4; background: #fff; color: #202122; overflow: hidden; font-family: var(--sans); }
+.pikiwrap[hidden] { display: none; }
+.pk { height: 100%; display: flex; flex-direction: column; }
+.pk-top { display: flex; align-items: center; gap: 16px; padding: 10px 18px; border-bottom: 1px solid #a2a9b1; background: #f8f9fa; }
+.pk-logo b { font: 700 24px Georgia, 'Times New Roman', serif; letter-spacing: .02em; }
+.pk-logo small { display: block; font-size: 11.5px; color: #54595d; }
+.pk-search { margin-left: auto; width: min(320px, 50%); font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid #a2a9b1; border-radius: 2px; color: #202122; background: #fff; }
+.pk-body { flex: 1; min-height: 0; display: flex; }
+.pk-nav { width: 190px; flex: none; overflow: auto; padding: 12px 10px 20px 16px; font-size: 13.5px; border-right: 1px solid #eaecf0; background: #f8f9fa; }
+.pk-navh { color: #54595d; font-size: 12px; margin-bottom: 6px; }
+.pk-nav a, .pk-locked { display: block; padding: 3px 4px; }
+.pk-nav a.on { font-weight: 700; color: #202122; }
+.pk-locked { color: #a2a9b1; cursor: default; }
+.pk a { color: #3366cc; text-decoration: none; }
+.pk a:hover { text-decoration: underline; }
+.pk-page { flex: 1; min-width: 0; overflow: auto; padding: 18px 28px 50px; font-size: 15px; line-height: 1.65; }
+.pk-page h1 { font: 400 28px Georgia, 'Times New Roman', 'Noto Serif Thai', serif; margin: 0; padding-bottom: 4px; border-bottom: 1px solid #a2a9b1; }
+.pk-page h2 { font: 400 21px Georgia, 'Times New Roman', 'Noto Serif Thai', serif; margin: 26px 0 8px; padding-bottom: 3px; border-bottom: 1px solid #a2a9b1; clear: none; }
+.pk-from { font-size: 12.5px; color: #54595d; margin: 4px 0 12px; }
+.pk-info { float: right; clear: right; width: 260px; margin: 0 0 12px 18px; border: 1px solid #a2a9b1; background: #f8f9fa; border-collapse: collapse; font-size: 13px; line-height: 1.5; }
+.pk-info th { background: #cee0f2; padding: 6px; font-size: 15px; }
+.pk-info td { padding: 5px 8px; border-top: 1px solid #eaecf0; vertical-align: top; }
+.pk-info td:first-child { font-weight: 600; width: 38%; }
+.pk-lead { margin-top: 0; }
+.pk-toc { display: inline-flex; flex-direction: column; gap: 2px; border: 1px solid #a2a9b1; background: #f8f9fa; padding: 8px 14px; font-size: 13.5px; margin: 4px 0 6px; }
+.pk-toc b { text-align: center; margin-bottom: 2px; }
+.pk code { font-family: var(--mono); font-size: 13px; background: #f8f9fa; border: 1px solid #eaecf0; border-radius: 2px; padding: 1px 4px; color: #000; }
+.pk-table { border-collapse: collapse; margin: 8px 0 12px; font-size: 14px; max-width: 100%; }
+.pk-table th, .pk-table td { border: 1px solid #a2a9b1; padding: 5px 10px; text-align: left; vertical-align: top; }
+.pk-table th { background: #eaecf0; }
+.pk-ex { margin: 10px 0 14px; border-left: 3px solid #a2a9b1; padding-left: 12px; }
+.pk-cmd { font-family: var(--mono); font-size: 14px; background: #0c0c0c; color: #ccc; padding: 6px 10px; border-radius: 3px 3px 0 0; }
+.pk-cmd span { color: #16c60c; }
+.pk-err { color: #f08c8c; }
+.pk-out { margin: 0; font-family: var(--mono); font-size: 13px; background: #1b1b1b; color: #ddd; padding: 6px 10px; white-space: pre-wrap; word-break: break-word; border-radius: 0 0 3px 3px; }
+.pk-cmd + .pk-note, .pk-out + .pk-note { margin-top: 4px; }
+.pk-note { font-size: 14px; color: #202122; }
+.pk-warn { margin: 10px 0; padding: 8px 12px; background: #fef6e7; border: 1px solid #fc3; font-size: 14px; }
+.pk-lockmsg { color: #54595d; }
+@media (max-width: 900px) { .pk-nav { display: none; } .pk-info { float: none; width: 100%; margin: 0 0 12px; } }

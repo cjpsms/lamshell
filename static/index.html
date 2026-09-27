@@ -42,6 +42,7 @@
       <div class="actions">
         <button id="hint"></button>
         <button id="reset" title="รีเซ็ตโลกของด่านนี้">ย้อนเวลา</button>
+        <button id="pikibtn" title="เปิด Piki คู่มือคำสั่ง (หรือพิมพ์ piki ชื่อคำสั่ง)">📘 Piki</button>
       </div>
       <div id="hintnote" class="muted small"></div>
     </section>
@@ -63,12 +64,17 @@
   <div class="stage">
     <div class="wt">
       <div class="wt-bar">
-        <div class="wt-tab">
+        <div class="wt-tab on" id="termtab" title="เทอร์มินัล">
           <span class="wt-icon">🐧</span>
           <span id="tabtitle" class="wt-title"></span>
           <span class="wt-x"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></span>
         </div>
-        <span class="wt-btn"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1"><path d="M6 .5v11M.5 6h11"/></svg></span>
+        <div class="wt-tab" id="pikitab" hidden title="Piki">
+          <span class="wt-icon">📘</span>
+          <span class="wt-title">Piki — สารานุกรมเสรี</span>
+          <span class="wt-x" id="pikiclose" title="ปิดแท็บ"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></span>
+        </div>
+        <span class="wt-btn" id="pikiplus" title="เปิด Piki (คู่มือคำสั่ง)"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1"><path d="M6 .5v11M.5 6h11"/></svg></span>
         <span class="wt-btn wt-drop"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.1"><path d="M1.5 3.5l3.5 3.5 3.5-3.5"/></svg></span>
         <span class="wt-drag"></span>
         <span class="wt-ctl"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><path d="M0 5.5h10"/></svg></span><span class="wt-ctl"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><rect x=".5" y=".5" width="9" height="9" rx="1"/></svg></span><span class="wt-ctl close"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><path d="M.5.5l9 9M9.5.5l-9 9"/></svg></span>
@@ -79,6 +85,7 @@
           <div class="inrow"><span id="pcwd" class="pcwd"></span><span id="plabel" class="plabel"></span><input id="cmd" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
         </div>
         <div id="overlay" class="overlay"></div>
+        <div id="piki" class="pikiwrap" hidden></div>
       </div>
     </div>
   </div>

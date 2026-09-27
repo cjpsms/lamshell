@@ -9,6 +9,7 @@ import { logInput, clearJournal } from './journal.js';
 import { session, key, signOut } from './account.js';
 import { track } from './sync.js';
 import { CHECKPOINTS, runQuiz } from './quiz.js';
+import { mountPiki, findPage } from './piki.js';
 
 const WHO = {
   lam: ['น้องล่าม', '🐧'], kru: ['ครูสมใจ', '👩‍🏫'], root: ['พี่รูท', '🧑‍💻'],
@@ -251,6 +252,7 @@ function aiReq(text) {
 let loading = 0, building = false;
 async function loadLevel(idx, { replay = false, reset = false } = {}) {
   const lv = LEVELS[idx];
+  quizOpen = false;
   // The next phase opens only after its checkpoint quiz (only on the way forward: finished phases stay open).
   const cp = checkpointBefore(idx);
   if (cp && !progress.quiz[cp]?.passed && idx === progress.unlocked && !replay) return openQuiz(cp, idx);
@@ -297,6 +299,8 @@ function checkpointBefore(idx) {
 
 async function openQuiz(cp, idx) {
   ++loading;
+  quizOpen = true;
+  closePiki();   // the quiz checks what the player knows: no encyclopedia during it
   if (pending) { pending = null; busy = false; input.classList.remove('busy'); }
   L = null;   // no level while the quiz is up: the terminal ignores input
   building = false;
@@ -340,9 +344,46 @@ async function openQuiz(cp, idx) {
   }
 }
 
+// ---------- Piki (the encyclopedia tab) ----------
+// Opens as a second tab of the terminal window. A page unlocks when the player has reached the level that
+// introduces it. Every page view is logged (research: how much players look things up), but costs no stars.
+let quizOpen = false;
+const piki = mountPiki($('#piki'), {
+  unlocked: p => LEVELS.findIndex(l => l.id === p.at) <= progress.unlocked,
+  lockedText: p => `(ปลดล็อกเมื่อไปถึงด่าน ${p.at})`,
+  onView: p => track('piki', { lv: L?.lv.id, phase: L?.lv.phase, page: p.id }),
+});
+function openPiki(pageId) {
+  if (quizOpen) return;
+  $('#pikitab').hidden = false;
+  $('#piki').hidden = false;
+  $('#termtab').classList.remove('on');
+  $('#pikitab').classList.add('on');
+  piki.refresh();
+  piki.show(pageId);
+}
+function showTerminal() {
+  $('#piki').hidden = true;
+  $('#pikitab').classList.remove('on');
+  $('#termtab').classList.add('on');
+  input.focus();
+}
+function closePiki() {
+  showTerminal();
+  $('#pikitab').hidden = true;
+}
+$('#pikiplus').onclick = () => openPiki();
+$('#pikibtn').onclick = () => openPiki();
+$('#pikitab').onclick = e => { if (!e.target.closest('#pikiclose')) openPiki(); };
+$('#pikiclose').onclick = e => { e.stopPropagation(); closePiki(); };
+$('#termtab').onclick = showTerminal;
+
 // ---------- input handling per phase ----------
 
 async function handle(text) {
+  // `piki` / `piki find`: open the encyclopedia (a game command, works in every phase)
+  const pk = /^piki(?:\s+(.+))?$/i.exec(text);
+  if (pk) { openPiki(findPage(pk[1])); if (pk[1] && !findPage(pk[1])) sys(`Piki ไม่มีหน้า "${pk[1]}" ลองค้นในช่องค้นหาของ Piki`); return; }
   if (L.passed && L.challenge) return challenge(text);
   const phase = L.lv.phase;
   const first = text.split(/\s+/)[0];

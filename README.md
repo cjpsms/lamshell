@@ -64,6 +64,11 @@ The generation scripts are not part of this repo.
   gets collected and why), then log in with username + password on any computer; the save follows them (kept on the
   server). Passwords are PBKDF2 hashes; a login gives the browser a token that the save and play events need.
   Forgotten password: the teacher sets a new one on the dashboard. A "play without saving" guest mode sends nothing.
+- **Piki** (`static/js/piki.js`): an in-game Wikipedia parody, opened as a second tab of the terminal window (`+`,
+  the 📘 Piki button, or typing `piki find`). 24 pages by command/idea (never by level): what it does, a Windows
+  comparison, syntax, options, examples on other files, the exact errors with what they mean, and pitfalls. Enough
+  to solve every level, but the player still applies it. Pages unlock when their level is reached; closed during
+  quizzes; views are logged (no star cost).
 - **Checkpoint quizzes** (`static/js/quiz.js`): after phases 1–4, ป้าเซิร์ฟ (the school server herself, VRM model
   `serv.vrm`) asks 5 questions in the terminal (type 1–4), drawn from a bank (what a command does, what a real error means). 4/5 (80%) opens the next phase;
   retries draw new questions.

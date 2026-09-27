@@ -153,6 +153,7 @@ function logText(e) {
     case 'pass': return `<span class="tag green">ผ่าน ${'★'.repeat(d.stars || 0)}</span> พิมพ์ ${d.attempts} ครั้ง · ${mins(d.ms)} · คำใบ้ ${d.hints || 0} ขั้น${d.decoder ? ' · เปิดสมุด' : ''}`;
     case 'hint': return `ใช้คำใบ้ขั้น ${d.step}`;
     case 'decoder': return 'เปิดสมุดถอดรหัส error';
+    case 'piki': return `อ่าน Piki หน้า <b>${esc(d.page)}</b>`;
     case 'preview_delete': return `ดูก่อนลบ ${d.n} รายการ → ${d.yes ? 'ยืนยันลบ' : 'ยกเลิก'}`;
     case 'quiz_start': return `เริ่มแบบทดสอบเช็กพอยต์ ${d.cp}`;
     case 'quiz': return `แบบทดสอบเช็กพอยต์ ${d.cp}: <b>${d.score}/${d.total}</b> <span class="tag ${d.passed ? 'green' : 'amber'}">${d.passed ? 'ผ่าน' : 'ไม่ผ่าน'}</span>`;
