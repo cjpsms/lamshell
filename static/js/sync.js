@@ -7,7 +7,7 @@ import { session, key, signOut } from './account.js';
 
 export const SAVED = ['lamshell.progress.v1', 'lamshell.world.v1', 'lamshell.journal.v1'];
 const OUTBOX = key('lamshell.outbox');
-const SYNC = key('lamshell.sync');     // { dirty: true } while the local save has changes the server hasn't got
+const SYNC = key('lamshell.sync');     // { dirty, updated }: dirty while the server lacks local changes; updated = server time of the save we have
 
 const get = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const put = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
@@ -32,7 +32,7 @@ async function pushState() {
       body: JSON.stringify({ token: session.token, data: JSON.parse(now) }),
     });
     if (r.status === 401) return signOut();   // the teacher reset the password: log in again
-    if (r.ok) { last = now; put(SYNC, JSON.stringify({ dirty: false })); }
+    if (r.ok) { last = now; put(SYNC, JSON.stringify({ dirty: false, updated: (await r.json()).updated })); }
   } catch {} finally { pushing = false; }
 }
 

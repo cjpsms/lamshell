@@ -9,10 +9,13 @@ const put = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStor
 
 const start = () => { $('#signin').hidden = true; import('./game.js'); };
 
-function useServerSave(me) {
-  const dirty = (() => { try { return JSON.parse(get(`lamshell.sync@${me.code}`) || '{}').dirty; } catch { return false; } })();
-  if (dirty || !me.state) return;   // this computer has progress the server hasn't seen yet: keep it, it gets pushed
-  for (const k of SAVED) if (k in me.state) put(`${k}@${me.code}`, me.state[k]);
+// Take the server's save when it's newer than the one this browser has (played on another computer, or changed by
+// the teacher) -- unless this browser has progress the server hasn't got yet: that one is kept and pushed.
+function useServerSave(me, code = me.code) {
+  const sync = (() => { try { return JSON.parse(get(`lamshell.sync@${code}`) || '{}'); } catch { return {}; } })();
+  if (sync.dirty || !me.state || (me.updated || 0) <= (sync.updated || 0)) return;
+  for (const k of SAVED) if (k in me.state) put(`${k}@${code}`, me.state[k]);
+  put(`lamshell.sync@${code}`, JSON.stringify({ dirty: false, updated: me.updated }));
 }
 
 function show() {
@@ -63,5 +66,15 @@ function show() {
 // A session from an older sign-in system (no token) has to log in again.
 const saved = (() => { try { return JSON.parse(get(SESSION) || 'null'); } catch { return null; } })();
 if (saved && !saved.token) put(SESSION, null);
-if (saved?.token || get(MODE) === 'guest') start();
+if (saved?.token) {
+  // Already logged in: check the server's save first (a few seconds at most; offline -> play the local one).
+  const ask = fetch('api/me', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: saved.token }) });
+  Promise.race([ask, new Promise((_, no) => setTimeout(no, 4000))])
+    .then(async r => {
+      if (r.status === 401) { put(SESSION, null); return show(); }   // password was reset: log in again
+      if (r.ok) useServerSave(await r.json(), saved.code);
+      start();
+    })
+    .catch(start);
+} else if (get(MODE) === 'guest') start();
 else show();

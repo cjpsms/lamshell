@@ -129,6 +129,15 @@ def _start(code):
             "state": json.loads(st["data"]) if st else None, "updated": st["updated"] if st else 0}
 
 
+def saved(code):
+    """The save kept on the server, for a browser that's already logged in (checked on every page load)."""
+    with _lock:
+        st = db().execute("SELECT data, updated FROM state WHERE code=?", (code,)).fetchone()
+        db().execute("UPDATE students SET last_seen=? WHERE code=?", (now_ms(), code))
+        db().commit()
+    return {"state": json.loads(st["data"]) if st else None, "updated": st["updated"] if st else 0}
+
+
 def who(token):
     """The student code a login token belongs to, or None."""
     if not token:

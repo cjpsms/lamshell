@@ -349,6 +349,9 @@ class Handler(SimpleHTTPRequestHandler):
                 except classroom.AccountError as e:
                     return self.send_json({"error": str(e)}, 400)
                 return self.send_json(me)
+            if path == "/api/me":
+                code = classroom.who(self.body().get("token"))
+                return self.send_json(classroom.saved(code)) if code else self.send_json({"error": "login"}, 401)
             if path in ("/api/state", "/api/events"):
                 req = self.body(4_000_000)
                 code = classroom.who(req.get("token"))
