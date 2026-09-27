@@ -3,7 +3,7 @@
 // checkpoint quiz results, and the research indicators. Refreshes every 10 seconds.
 import { LEVELS, phaseLabel } from './levels.js';
 import { CHECKPOINTS } from './quiz.js';
-import { loadRoster, importFile, clearRoster, nameOf, templateCsv } from './roster.js';
+import { parseFile, templateCsv } from './roster.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -22,8 +22,6 @@ const bar = (x, label) => `<div class="bar"><i style="width:${Math.round((x || 0
 const phaseName = ph => ph == null ? '-' : phaseLabel(/^\d$/.test(ph) ? +ph : ph);
 
 let data = null, tab = 'people';
-let roster = loadRoster();
-const who = s => nameOf(roster, s.class, s.seat);
 
 // ---------- sign in ----------
 async function auth() {
@@ -79,22 +77,24 @@ function render() {
   if (!data) return;
   $('#view').innerHTML = { people, levels, errors, thai, quiz, research }[tab]();
   if (tab === 'people') {
-    document.querySelectorAll('.del').forEach(b => {
-      b.onclick = async () => {
-        if (!confirm(`ลบข้อมูลทั้งหมดของ ${b.dataset.name} (${b.dataset.code})? ลบแล้วกู้คืนไม่ได้`)) return;
-        await api('delete', { code: b.dataset.code });
-        load();
-      };
+    const act = (sel, fn) => document.querySelectorAll(sel).forEach(b => { b.onclick = () => fn(b.dataset); });
+    act('.del', async d => {
+      if (!confirm(`ลบข้อมูลทั้งหมดของ ${d.name} (${d.code})? ลบแล้วกู้คืนไม่ได้`)) return;
+      await api('delete', { code: d.code });
+      load();
     });
+    act('.ok', async d => { await api('approve', { code: d.code }); load(); });
+    act('.no', async d => { await api('delete', { code: d.code }); load(); });
   }
 }
 
-// ---------- class list (names stay in this browser, see roster.js) ----------
+// ---------- class list: read here from Excel/CSV, kept on the server, matched against names at sign-in ----------
 function setupRoster() {
   const panel = $('#roster'), status = $('#rstatus');
   const summary = () => {
-    const n = Object.keys(roster.names).length;
-    status.innerHTML = n ? `มีรายชื่อในเครื่องนี้ ${n} คน จากไฟล์ ${roster.files.map(esc).join(', ')}` : 'ยังไม่มีรายชื่อ';
+    const R = data?.roster || {};
+    const n = Object.values(R).reduce((a, c) => a + c.n, 0);
+    status.innerHTML = n ? `มีรายชื่อในระบบ ${n} คน: ${Object.entries(R).map(([k, c]) => `${esc(k)} ${c.n} คน`).join(', ')}` : 'ยังไม่มีรายชื่อ (ตอนนี้ใครลงชื่อก็เข้าเล่นได้เลย)';
   };
   $('#rosterbtn').onclick = () => { panel.hidden = !panel.hidden; summary(); };
   $('#rfile').onchange = async e => {
@@ -102,12 +102,17 @@ function setupRoster() {
     e.target.value = '';
     if (!file) return;
     try {
-      const r = await importFile(file, $('#rclass').value);
-      roster = loadRoster();
-      const per = Object.entries(r.classes).map(([k, n]) => `${esc(k)} ${n} คน`).join(', ');
-      status.innerHTML = (r.n ? `✓ อ่านได้ ${r.n} คน (${per})` : 'อ่านชื่อไม่ได้เลย') +
-        r.problems.map(p => `<div class="bad">⚠ ${esc(p)}</div>`).join('');
-      render();
+      const r = await parseFile(file, $('#rclass').value);
+      let msg = '';
+      if (r.rows.length) {
+        const res = await api('roster', { rows: r.rows });
+        if (!res.ok) throw new Error(res.data.error || 'บันทึกไม่สำเร็จ');
+        const per = Object.entries(r.classes).map(([k, n]) => `${esc(k)} ${n} คน`).join(', ');
+        msg = `✓ บันทึกรายชื่อ ${res.data.saved} คน (${per}) ห้องที่อยู่ในไฟล์นี้ถูกแทนที่ด้วยรายชื่อใหม่` +
+          (res.data.let_in ? ` · ปล่อยคนที่รออยู่เข้าเล่นแล้ว ${res.data.let_in} คน` : '');
+      } else msg = 'อ่านชื่อไม่ได้เลย';
+      status.innerHTML = msg + r.problems.map(p => `<div class="bad">⚠ ${esc(p)}</div>`).join('');
+      load();
     } catch (x) { status.innerHTML = `<span class="bad">⚠ ${esc(x.message)}</span>`; }
   };
   $('#rtemplate').onclick = e => {
@@ -117,28 +122,45 @@ function setupRoster() {
     a.download = 'รายชื่อนักเรียน.csv';
     a.click();
   };
-  $('#rclear').onclick = () => { clearRoster(); roster = loadRoster(); summary(); render(); };
+  $('#rclear').onclick = async () => {
+    if (!confirm('ลบรายชื่อนักเรียนทั้งหมดออกจากระบบ? (ข้อมูลการเล่นยังอยู่ แต่ต่อไปใครลงชื่อก็เข้าได้เลย)')) return;
+    await api('roster/clear', {});
+    await load();
+    summary();
+  };
 }
 
 // ---------- tabs ----------
 function people() {
-  const S = data.students;
-  if (!S.length) return '<div class="empty">ยังไม่มีนักเรียนลงชื่อเข้าเล่น (นักเรียนกรอกชั้น + เลขที่เองได้ที่หน้าเกม)</div>';
+  const all = data.students;
+  const waiting = all.filter(s => s.status === 'pending');
+  const S = all.filter(s => s.status !== 'pending');
+  const missing = Object.entries(data.roster || {}).filter(([, c]) => c.missing.length);
   const stuck = S.filter(s => s.stuck);
   const cps = Object.keys(CHECKPOINTS);
+  const place = s => `${s.class} เลขที่ ${s.seat}`;
   const rows = S.map(s => `<tr class="${s.stuck ? 'stuck' : ''}">
-    <td><span class="dot ${s.online ? 'on' : ''}"></span>${esc(s.class)}</td><td>${esc(s.seat)}</td><td>${esc(who(s)) || '<span class="muted">-</span>'}</td><td class="mono">${esc(s.code)}</td>
+    <td><span class="dot ${s.online ? 'on' : ''}"></span>${esc(s.class)}</td><td>${esc(s.seat)}</td>
+    <td>${esc(s.name)}${s.listed ? '' : ' <span class="tag amber" title="ไม่อยู่ในรายชื่อ ครูกดยอมรับเอง">นอกรายชื่อ</span>'}</td>
     <td>${esc(lvName(s.current))}${s.stuck ? ` <span class="tag red">ติด ${mins(s.on_level_ms)}</span>` : s.on_level_ms != null && s.online ? ` <span class="muted">${mins(s.on_level_ms)}</span>` : ''}</td>
     <td>${esc(s.front || '-')}</td><td>★ ${s.stars}</td>
     ${cps.map(c => { const q = s.quiz[c]; return `<td>${q ? `<span class="tag ${q.passed ? 'green' : 'amber'}">${q.best}/${q.total}</span> <span class="muted">${q.tries} รอบ</span>` : '<span class="muted">-</span>'}</td>`; }).join('')}
     <td>${s.inputs}</td><td class="muted">${ago(s.last, data.now)}</td>
-    <td><button class="del" title="ลบข้อมูลนักเรียนคนนี้" data-code="${esc(s.code)}" data-name="${esc((who(s) ? who(s) + ' ' : '') + s.class + ' เลขที่ ' + s.seat)}">🗑</button></td></tr>`).join('');
-  return `${stuck.length ? `<h2>🚨 ติดด่านเดิมเกิน 5 นาที (${stuck.length} คน) ครูไปช่วยได้เลย</h2>
-    <p class="note">${stuck.map(s => `<b>${esc(who(s) || s.class + ' เลขที่ ' + s.seat)}</b> (${esc(who(s) ? s.class + ' เลขที่ ' + s.seat : s.code)}) ด่าน ${esc(lvName(s.current))}`).join(' · ')}</p>` : ''}
+    <td><button class="del" title="ลบข้อมูลนักเรียนคนนี้" data-code="${esc(s.code)}" data-name="${esc(s.name + ' ' + place(s))}">🗑</button></td></tr>`).join('');
+  return `${waiting.length ? `<div class="waiting"><h2>✋ รอครูกดยอมรับ (${waiting.length} คน)</h2>
+    <p class="note">ชื่อที่พิมพ์ไม่ตรงกับรายชื่อนักเรียน (ต่ำกว่า 90%) ดูว่าเป็นนักเรียนจริงไหม แล้วกดยอมรับ</p>
+    <div class="tbl"><table><tr><th>ชื่อที่พิมพ์</th><th>ชั้น</th><th>เลขที่</th><th>ในรายชื่อ เลขที่นี้คือ</th><th>เมื่อ</th><th></th></tr>
+    ${waiting.map(s => `<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.class)}</td><td>${esc(s.seat)}</td>
+      <td class="muted">${esc(data.roster?.[s.class]?.missing.find(m => m.seat === s.seat)?.name || '-')}</td><td class="muted">${ago(s.last_seen, data.now)}</td>
+      <td><button class="btn ok" data-code="${esc(s.code)}">✓ ยอมรับ</button> <button class="btn no" data-code="${esc(s.code)}">✗ ไม่ใช่</button></td></tr>`).join('')}</table></div></div>` : ''}
+    ${stuck.length ? `<h2>🚨 ติดด่านเดิมเกิน 5 นาที (${stuck.length} คน) ครูไปช่วยได้เลย</h2>
+    <p class="note">${stuck.map(s => `<b>${esc(s.name)}</b> (${esc(place(s))}) ด่าน ${esc(lvName(s.current))}`).join(' · ')}</p>` : ''}
     <h2>ความคืบหน้ารายคน (${S.length} คน)</h2>
-    <p class="note">${Object.keys(roster.names).length ? 'ชื่อมาจากไฟล์รายชื่อในเครื่องนี้ (เซิร์ฟเวอร์ไม่มีชื่อ)' : 'ยังไม่มีชื่อ: กด 📋 รายชื่อนักเรียน แล้วเลือกไฟล์ Excel ของห้อง'} · ด่านที่เปิดอยู่ = ด่านที่กำลังเล่นตอนนี้ · ไกลสุด = ด่านที่ปลดล็อกไกลที่สุด · จุดเขียว = ออนไลน์ภายใน 3 นาที</p>
-    <div class="tbl"><table><tr><th>ชั้น</th><th>เลขที่</th><th>ชื่อ</th><th>รหัส</th><th>ด่านที่เปิดอยู่</th><th>ไกลสุด</th><th>ดาว</th>
-    ${cps.map(c => `<th>เช็กพอยต์ ${c}</th>`).join('')}<th>พิมพ์ไป</th><th>ล่าสุด</th><th></th></tr>${rows}</table></div>`;
+    ${S.length ? `<p class="note">ด่านที่เปิดอยู่ = ด่านที่กำลังเล่นตอนนี้ · ไกลสุด = ด่านที่ปลดล็อกไกลที่สุด · จุดเขียว = ออนไลน์ภายใน 3 นาที</p>
+    <div class="tbl"><table><tr><th>ชั้น</th><th>เลขที่</th><th>ชื่อ</th><th>ด่านที่เปิดอยู่</th><th>ไกลสุด</th><th>ดาว</th>
+    ${cps.map(c => `<th>เช็กพอยต์ ${c}</th>`).join('')}<th>พิมพ์ไป</th><th>ล่าสุด</th><th></th></tr>${rows}</table></div>`
+    : '<div class="empty">ยังไม่มีนักเรียนเข้าเล่น</div>'}
+    ${missing.length ? `<h2>ยังไม่ได้ลงชื่อเข้าเล่น</h2>${missing.map(([k, c]) => `<p class="note"><b>${esc(k)}</b> (${c.missing.length}/${c.n} คน): ${c.missing.map(m => `${esc(m.seat)}. ${esc(m.name)}`).join(' · ')}</p>`).join('')}` : ''}`;
 }
 
 function levels() {

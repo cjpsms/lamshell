@@ -298,6 +298,8 @@ mark { background: #4a3a14; color: var(--c-yellow); padding: 0 2px; }
 .si-code { text-align: center; }
 .si-code[hidden], .signin form[hidden] { display: none; }
 .si-code .code { font: 700 40px var(--mono); color: var(--c-cyan); letter-spacing: .06em; }
+.si-wait .spin { width: 34px; height: 34px; margin: 6px auto; border: 3px solid #333; border-top-color: var(--c-cyan); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .signin .go { background: var(--c-green-d); border: 0; border-radius: 6px; padding: 10px; font-weight: 700; font-size: 15px; color: #fff; }
 .signin .go:disabled { background: #2a2a2a; color: var(--muted); cursor: not-allowed; }
 .signin .guest { align-self: center; }

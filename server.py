@@ -319,9 +319,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "login"}, 401)
             buf = io.StringIO()
             w = csv.writer(buf)
-            w.writerow(["code", "class", "seat", "time", "type", "level", "phase", "data"])
+            w.writerow(["code", "name", "class", "seat", "time", "type", "level", "phase", "data"])
             for r in classroom.export_rows(klass):
-                w.writerow([*r[:3], time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(r[3] / 1000)), *r[4:]])
+                w.writerow([*r[:4], time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(r[4] / 1000)), *r[5:]])
             data = ("\ufeff" + buf.getvalue()).encode()   # BOM: Excel reads the Thai as UTF-8
             self.send_response(200)
             self.send_header("Content-Type", "text/csv; charset=utf-8")
@@ -341,8 +341,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(interpret(self.body()))
             if path == "/api/register":
                 req = self.body()
-                me = classroom.register(req.get("class"), req.get("seat"), req.get("consent") is True)
-                return self.send_json(me) if me else self.send_json({"error": "กรอกชั้น เลขที่ และกดยอมรับก่อน"}, 400)
+                me = classroom.register(req.get("name"), req.get("class"), req.get("seat"), req.get("consent") is True)
+                return self.send_json(me) if me else self.send_json({"error": "กรอกชื่อ ชั้น เลขที่ และกดยอมรับก่อน"}, 400)
             if path == "/api/login":
                 me = classroom.login(self.body().get("code"))
                 return self.send_json(me) if me else self.send_json({"error": "ไม่พบผู้เล่นนี้"}, 404)
@@ -366,6 +366,14 @@ class Handler(SimpleHTTPRequestHandler):
                 if not self.teacher():
                     return self.send_json({"error": "login"}, 401)
                 req = self.body()
+                if path == "/api/teacher/roster":
+                    return self.send_json(classroom.set_roster(req.get("rows") or []))
+                if path == "/api/teacher/roster/clear":
+                    classroom.clear_roster()
+                    return self.send_json({"ok": True})
+                if path == "/api/teacher/approve":
+                    classroom.approve(classroom.norm_code(req.get("code")))
+                    return self.send_json({"ok": True})
                 if path == "/api/teacher/delete":
                     classroom.delete_code(classroom.norm_code(req.get("code")))
                     return self.send_json({"ok": True})

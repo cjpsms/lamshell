@@ -1,25 +1,11 @@
-// The teacher's class list (class + seat -> name), read from their own Excel (.xlsx) or CSV file.
-// It stays in this browser only (localStorage of the teacher page): names are never sent to the server, which
-// knows students only as class + seat + code.
+// Reads the teacher's class list (class + seat + name) from their Excel (.xlsx) or CSV file. The dashboard sends the
+// rows to the server, which matches students' names against it at sign-in (classroom.register).
 //
 // .xlsx is read without a library: it's a zip of XML files, unzipped with the browser's DecompressionStream.
-const STORE = 'lamshell.roster';
 
-// Same normalising as the server (classroom.register): "ม. 4/2" = "ม.4/2", seat "07" = "7".
+// Same normalising as the server: "ม. 4/2" = "ม.4/2", seat "07" = "7".
 export const normClass = s => String(s ?? '').replace(/\s+/g, '').trim();
 export const normSeat = s => String(s ?? '').trim().replace(/\.0+$/, '').replace(/^0+(?=\d)/, '');
-const keyOf = (klass, seat) => normClass(klass) + '|' + normSeat(seat);
-
-export function loadRoster() {
-  try { return JSON.parse(localStorage.getItem(STORE) || 'null') || { names: {}, files: [] }; } catch { return { names: {}, files: [] }; }
-}
-function store(r) {
-  try { localStorage.setItem(STORE, JSON.stringify(r)); } catch {}
-}
-export function clearRoster() {
-  try { localStorage.removeItem(STORE); } catch {}
-}
-export const nameOf = (roster, klass, seat) => roster.names[keyOf(klass, seat)] || '';
 
 // ---------- reading files -> rows of cells (per sheet) ----------
 
@@ -139,31 +125,19 @@ function parseSheet(sheet, fallbackClass) {
   return { rows: out, problem: missingClass ? 'ไม่รู้ว่าเป็นชั้นไหน: ใส่ชั้นในช่องด้านบนแล้วเลือกไฟล์อีกครั้ง' : '' };
 }
 
-// Read a file into the roster (merging with what's already loaded). Returns a summary for the teacher.
-export async function importFile(file, fallbackClass = '') {
+// Read a file into rows [{klass, seat, name}] + a summary for the teacher.
+export async function parseFile(file, fallbackClass = '') {
   const buf = await file.arrayBuffer();
-  const isXlsx = /\.xlsx$/i.test(file.name) || new Uint8Array(buf, 0, 2).join() === '80,75';   // "PK"
   if (/\.xls$/i.test(file.name)) throw new Error('ไฟล์ .xls แบบเก่าอ่านไม่ได้ กด "บันทึกเป็น" ใน Excel แล้วเลือก .xlsx');
+  const isXlsx = /\.xlsx$/i.test(file.name) || new Uint8Array(buf, 0, 2).join() === '80,75';   // "PK"
   const sheets = isXlsx ? await readXlsx(buf) : readCsv(new TextDecoder().decode(buf));
-  const roster = loadRoster();
-  const classes = {};
-  const problems = [];
-  let n = 0;
+  const rows = [], classes = {}, problems = [];
   for (const sh of sheets) {
-    const { rows, problem } = parseSheet(sh, fallbackClass);
-    if (problem && !rows.length) problems.push((sh.name ? `ชีต ${sh.name}: ` : '') + problem);
-    else if (problem) problems.push(problem);
-    for (const r of rows) {
-      roster.names[keyOf(r.klass, r.seat)] = r.name;
-      classes[r.klass] = (classes[r.klass] || 0) + 1;
-      n++;
-    }
+    const r = parseSheet(sh, fallbackClass);
+    if (r.problem) problems.push((sh.name && !r.rows.length ? `ชีต ${sh.name}: ` : '') + r.problem);
+    for (const x of r.rows) { rows.push(x); classes[x.klass] = (classes[x.klass] || 0) + 1; }
   }
-  if (n) {
-    roster.files = [...roster.files.filter(f => f !== file.name), file.name];
-    store(roster);
-  }
-  return { n, classes, problems };
+  return { rows, classes, problems };
 }
 
 // A starter file the teacher can open in Excel (UTF-8 BOM so Thai shows right).

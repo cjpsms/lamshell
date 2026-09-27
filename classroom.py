@@ -1,15 +1,19 @@
 """Classroom side of LamShell: student codes, saved progress, play events, and the teacher dashboard's numbers.
 
-Stdlib only (sqlite3). No names are stored (PDPA, the players are minors): a student signs in with class + seat
-number and ticks the consent box, and gets a code like TQ-7F3K. The teacher matches codes to names on their own
-list, outside the system. The teacher password lives hashed in config.json (settings.py), set in the terminal.
+Stdlib only (sqlite3). Sign-in (cj, 2026-09-27): the student types name + class + seat and ticks the consent box.
+The name is matched against the teacher's class list (uploaded from Excel): same name, or >= 90% similar, looking
+at the name only (prefixes like นาย/ด.ญ. and spaces ignored) -> in, as that list entry. Not on the list -> waits
+until the teacher approves them on the dashboard. No list uploaded yet -> everyone gets in.
+The teacher password lives hashed in config.json (settings.py), set in the terminal.
 
 Tables
-  students(code, class, seat, created, last_seen, consent)
+  students(code, name, class, seat, status 'ok'|'pending', listed, created, last_seen, consent)
+  roster(class, seat, name)           -- the teacher's class list
   state(code, data, updated)          -- the browser's save (progress + machine + journal), newest wins
   events(code, ts, type, level, phase, data)   -- one row per thing that happened in play, for research
   sessions(token, created)            -- teacher logins
 """
+import difflib
 import hashlib
 import json
 import re
@@ -41,9 +45,11 @@ def db():
         _db.row_factory = sqlite3.Row
         _db.executescript("""
             PRAGMA journal_mode=WAL;
-            CREATE TABLE IF NOT EXISTS students (code TEXT PRIMARY KEY,
-                class TEXT NOT NULL DEFAULT '', seat TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL,
-                last_seen INTEGER, consent INTEGER);
+            CREATE TABLE IF NOT EXISTS students (code TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
+                class TEXT NOT NULL DEFAULT '', seat TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'ok',
+                listed INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL, last_seen INTEGER, consent INTEGER);
+            CREATE TABLE IF NOT EXISTS roster (class TEXT NOT NULL, seat TEXT NOT NULL, name TEXT NOT NULL,
+                PRIMARY KEY (class, seat));
             CREATE TABLE IF NOT EXISTS state (code TEXT PRIMARY KEY, data TEXT NOT NULL, updated INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, code TEXT NOT NULL, ts INTEGER NOT NULL,
                 type TEXT NOT NULL, level TEXT, phase TEXT, data TEXT NOT NULL DEFAULT '{}');
@@ -70,24 +76,79 @@ def clean(s, n):
     return re.sub(r"\s+", " ", str(s or "")).strip()[:n]
 
 
-def register(klass, seat, consent):
-    """Sign in by class + seat. The same two again (on any computer) find the same student."""
-    klass, seat = clean(klass, 20).replace(" ", ""), clean(seat, 4).lstrip("0")
-    if not klass or not seat or not consent:
+MATCH = 0.9
+PREFIX = re.compile(r"^(นางสาว|นาง|นาย|เด็กชาย|เด็กหญิง|ด\.?\s?ช\.?|ด\.?\s?ญ\.?|น\.?\s?ส\.?|mrs?\.?|ms\.?|miss)\s*", re.I)
+
+
+def norm_class(s):
+    return re.sub(r"\s+", "", str(s or "")).replace("-", "/")[:20]
+
+
+def norm_seat(s):
+    s = re.sub(r"\.0+$", "", str(s or "").strip())
+    return (s.lstrip("0") or s)[:4]
+
+
+def name_key(name):
+    """What gets compared: no title, no spaces, lower case."""
+    return re.sub(r"[\s\u200b]+", "", PREFIX.sub("", clean(name, 120))).lower()
+
+
+def similar(a, b):
+    a, b = name_key(a), name_key(b)
+    return difflib.SequenceMatcher(None, a, b).ratio() if a and b else 0.0
+
+
+def roster_match(name, klass="", seat=""):
+    """Best class-list entry for this name (>= MATCH), preferring the class/seat the student typed."""
+    with _lock:
+        rows = db().execute("SELECT class, seat, name FROM roster").fetchall()
+    best, score = None, 0.0
+    for r in rows:
+        sc = similar(name, r["name"])
+        if sc < MATCH:
+            continue
+        rank = sc + (0.01 if r["class"] == klass else 0) + (0.005 if r["seat"] == seat else 0)
+        if rank > score:
+            best, score = dict(r), rank
+    return best
+
+
+def roster_size():
+    with _lock:
+        return db().execute("SELECT COUNT(*) FROM roster").fetchone()[0]
+
+
+def _new_code():
+    while True:
+        code = "TQ-" + "".join(secrets.choice(ALPHABET) for _ in range(4))
+        if not db().execute("SELECT 1 FROM students WHERE code=?", (code,)).fetchone():
+            return code
+
+
+def register(name, klass, seat, consent):
+    """Sign in. The same name again (on any computer) finds the same student."""
+    name, klass, seat = clean(name, 120), norm_class(klass), norm_seat(seat)
+    if not name_key(name) or not klass or not seat or not consent:
         return None
+    m = roster_match(name, klass, seat)
+    listed = bool(m)
+    if m:
+        name, klass, seat = m["name"], m["class"], m["seat"]
+    status = "ok" if listed or not roster_size() else "pending"
     t = now_ms()
     with _lock:
-        row = db().execute("SELECT * FROM students WHERE class=? AND seat=?", (klass, seat)).fetchone()
+        rows = db().execute("SELECT * FROM students WHERE class=? AND seat=?", (klass, seat)).fetchall()
+        row = next((r for r in rows if similar(r["name"], name) >= MATCH or (listed and r["listed"])), None)
         if row:
             code = row["code"]
-            db().execute("UPDATE students SET last_seen=?, consent=COALESCE(consent, ?) WHERE code=?", (t, t, code))
+            new_status = "ok" if status == "ok" else row["status"]   # an approved student stays approved
+            db().execute("UPDATE students SET name=?, status=?, listed=MAX(listed, ?), last_seen=?, "
+                         "consent=COALESCE(consent, ?) WHERE code=?", (name, new_status, int(listed), t, t, code))
         else:
-            while True:
-                code = "TQ-" + "".join(secrets.choice(ALPHABET) for _ in range(4))
-                if not db().execute("SELECT 1 FROM students WHERE code=?", (code,)).fetchone():
-                    break
-            db().execute("INSERT INTO students(code, class, seat, created, last_seen, consent) VALUES(?,?,?,?,?,?)",
-                         (code, klass, seat, t, t, t))
+            code = _new_code()
+            db().execute("INSERT INTO students(code, name, class, seat, status, listed, created, last_seen, consent) "
+                         "VALUES(?,?,?,?,?,?,?,?,?)", (code, name, klass, seat, status, int(listed), t, t, t))
         db().commit()
     return login(code)
 
@@ -103,13 +164,53 @@ def login(code):
         db().execute("UPDATE students SET last_seen=? WHERE code=?", (now_ms(), code))
         db().commit()
         st = db().execute("SELECT data, updated FROM state WHERE code=?", (code,)).fetchone()
-    return {"code": code, "class": row["class"], "seat": row["seat"],
-            "state": json.loads(st["data"]) if st else None, "updated": st["updated"] if st else 0}
+    return {"code": code, "name": row["name"], "class": row["class"], "seat": row["seat"], "status": row["status"],
+            "listed": bool(row["listed"]), "state": json.loads(st["data"]) if st else None,
+            "updated": st["updated"] if st else 0}
+
+
+# ---------------- the teacher's class list + approvals ----------------
+
+def set_roster(rows):
+    """Replace the list for every class in rows, then let in anyone waiting whose name now matches."""
+    clean_rows = []
+    for r in rows[:5000]:
+        k, s_, n = norm_class(r.get("klass") or r.get("class")), norm_seat(r.get("seat")), clean(r.get("name"), 120)
+        if k and s_ and name_key(n):
+            clean_rows.append((k, s_, n))
+    with _lock:
+        for k in {r[0] for r in clean_rows}:
+            db().execute("DELETE FROM roster WHERE class=?", (k,))
+        db().executemany("INSERT OR REPLACE INTO roster(class, seat, name) VALUES(?,?,?)", clean_rows)
+        db().commit()
+        waiting = db().execute("SELECT code, name, class, seat FROM students WHERE status='pending'").fetchall()
+    let_in = 0
+    for w in waiting:
+        m = roster_match(w["name"], w["class"], w["seat"])
+        if m:
+            with _lock:
+                db().execute("UPDATE students SET status='ok', listed=1, name=?, class=?, seat=? WHERE code=?",
+                             (m["name"], m["class"], m["seat"], w["code"]))
+                db().commit()
+            let_in += 1
+    return {"saved": len(clean_rows), "let_in": let_in}
+
+
+def clear_roster():
+    with _lock:
+        db().execute("DELETE FROM roster")
+        db().commit()
+
+
+def approve(code):
+    with _lock:
+        db().execute("UPDATE students SET status='ok' WHERE code=?", (code,))
+        db().commit()
 
 
 def known(code):
     with _lock:
-        return db().execute("SELECT 1 FROM students WHERE code=?", (code,)).fetchone() is not None
+        return db().execute("SELECT 1 FROM students WHERE code=? AND status='ok'", (code,)).fetchone() is not None
 
 
 def save_state(code, data):
@@ -221,7 +322,11 @@ def overview(klass=None):
         studs = [dict(r) for r in db().execute(
             "SELECT * FROM students" + (" WHERE class=?" if klass else "") + " ORDER BY class, CAST(seat AS INTEGER), code",
             (klass,) if klass else ()).fetchall()]
-        classes = [r[0] for r in db().execute("SELECT DISTINCT class FROM students ORDER BY class").fetchall()]
+        classes = [r[0] for r in db().execute(
+            "SELECT class FROM students UNION SELECT class FROM roster ORDER BY class").fetchall()]
+        roster = [dict(r) for r in db().execute(
+            "SELECT class, seat, name FROM roster" + (" WHERE class=?" if klass else "") + " ORDER BY class, CAST(seat AS INTEGER)",
+            (klass,) if klass else ()).fetchall()]
         codes = [s["code"] for s in studs]
         q = ",".join("?" * len(codes))
         evs = [dict(r) for r in db().execute(
@@ -367,7 +472,16 @@ def overview(klass=None):
         "look_before_delete": {"rate": round(sum(1 for x in looks if x) / len(looks), 3) if looks else None, "levels": len(looks)},
     }
 
-    return {"now": t_now, "classes": classes, "students": studs, "levels": levels, "errors": err_list[:60],
+    joined = {(s["class"], s["seat"]) for s in studs if s["listed"]}
+    roster_info = {}
+    for x in roster:
+        c = roster_info.setdefault(x["class"], {"n": 0, "joined": 0, "missing": []})
+        c["n"] += 1
+        if (x["class"], x["seat"]) in joined:
+            c["joined"] += 1
+        else:
+            c["missing"].append({"seat": x["seat"], "name": x["name"]})
+    return {"now": t_now, "classes": classes, "students": studs, "roster": roster_info, "levels": levels, "errors": err_list[:60],
             "untranslated": untranslated, "quiz": quiz, "metrics": metrics}
 
 
@@ -375,7 +489,7 @@ def export_rows(klass=None):
     """Every event as flat rows (for Excel / SPSS)."""
     with _lock:
         rows = db().execute(
-            "SELECT e.code, s.class, s.seat, e.ts, e.type, e.level, e.phase, e.data FROM events e "
+            "SELECT e.code, s.name, s.class, s.seat, e.ts, e.type, e.level, e.phase, e.data FROM events e "
             "JOIN students s ON s.code=e.code" + (" WHERE s.class=?" if klass else "") + " ORDER BY e.code, e.ts, e.id",
             (klass,) if klass else ()).fetchall()
     return rows
