@@ -77,4 +77,7 @@ if (saved?.token) {
     })
     .catch(start);
 } else if (get(MODE) === 'guest') start();
-else show();
+else {
+  // No server (e.g. the web demo): nothing to sign in to, so play without saving straight away.
+  fetch('api/health', { signal: AbortSignal.timeout(2500) }).then(r => r.json()).then(() => show()).catch(start);
+}

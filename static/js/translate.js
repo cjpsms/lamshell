@@ -1,4 +1,6 @@
 // Turns what the player typed into a real command via Claude Haiku (/api/interpret -> server.py -> claude CLI).
+// Without a server or AI (e.g. the web demo) it falls back to the phrase dictionary in offline.js.
+import { offlineInterpret } from './offline.js';
 
 // ---------- Kedmanee (Thai) keyboard -> QWERTY, for "forgot to switch language" ----------
 const KED = {
@@ -23,10 +25,11 @@ let aiState = null;
 export async function aiStatus() {
   if (aiState) return aiState;
   try {
-    const r = await fetch('/api/health', { signal: AbortSignal.timeout(3000) });
-    aiState = { ok: !!(await r.json()).ai };
+    const r = await fetch('api/health', { signal: AbortSignal.timeout(3000) });
+    const j = await r.json();
+    aiState = { ok: !!j.ai, server: true, model: j.model || '' };
   } catch {
-    aiState = { ok: false };
+    aiState = { ok: false, server: false };
   }
   return aiState;
 }
@@ -36,17 +39,19 @@ const OFFLINE = 'แค่กๆ... น้องล่ามติดต่อ�
 // req: { level, phase, text, cwd, tree, mission, aliases }
 // -> { command|null, confidence, explain, parts: [{token, meaning}], reply, offline? }
 export async function interpret(req) {
+  const fallback = () => (req.mode === 'fix' ? { command: null, reply: OFFLINE, offline: true } : offlineInterpret(req));
+  if (!(await aiStatus()).ok) return fallback();
   try {
-    const r = await fetch('/api/interpret', {
+    const r = await fetch('api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
       signal: AbortSignal.timeout(60000),
     });
     const j = await r.json();
-    if (!r.ok || j.error) return { command: null, reply: OFFLINE, offline: true };
+    if (!r.ok || j.error) return fallback();
     return j;
   } catch {
-    return { command: null, reply: OFFLINE, offline: true };
+    return fallback();
   }
 }

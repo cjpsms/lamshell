@@ -24,7 +24,13 @@ let data = null, tab = 'people';
 
 // ---------- sign in ----------
 async function auth() {
-  const st = (await fetch('api/teacher/status').then(r => r.json())) || {};
+  const st = await fetch('api/teacher/status').then(r => r.json()).catch(() => null);
+  if (!st) {   // the web version (GitHub Pages) has no server behind it
+    $('#auth').hidden = false;
+    $('#authmsg').textContent = 'หน้าครูใช้ได้เมื่อรันเซิร์ฟเวอร์บนเครื่อง (./lamshell) เวอร์ชันออนไลน์ไม่มีบัญชีนักเรียนและหน้าครู';
+    document.querySelector('#auth form').querySelectorAll('input, button').forEach(el => { el.hidden = true; });
+    return;
+  }
   if (st.in) return start();
   const box = $('#auth'), f = box.querySelector('form');
   box.hidden = false;

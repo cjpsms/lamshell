@@ -1043,7 +1043,8 @@ $('#wipe').onclick = () => {
 (async () => {
   const st = await aiStatus();
   const el = $('#ai');
-  el.textContent = st.ok ? 'AI: Claude Haiku' : 'AI ออฟไลน์';
+  el.textContent = st.ok ? 'AI: ' + st.model : 'แปลแบบออฟไลน์';
+  el.title = st.ok ? 'น้องล่ามใช้ AI แปลภาษาไทย' : 'ไม่มี AI: น้องล่ามแปลจากพจนานุกรมในเกม (ประโยคง่ายๆ ใช้ได้)';
   el.className = 'ai ' + (st.ok ? 'on' : 'off');
   const start = Math.min(progress.unlocked, LEVELS.length - 1);
   loadLevel(start);
