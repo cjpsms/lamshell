@@ -151,7 +151,11 @@ async function ask(who, text, extraHtml = '') {
   el.appendChild(btns);
   feed.scrollTop = feed.scrollHeight;
   btns.onclick = e => { const a = e.target.dataset.a; if (a && pending) submit(a); };
-  const a = await io.prompt('(y/n) ');
+  const a = await io.prompt('(y/n) ', { yn: true });
+  if (a === null && cutIn) {   // the player typed a new command instead of answering: drop the question
+    btns.querySelectorAll('button').forEach(b => { b.disabled = true; });
+    return null;
+  }
   const yes = !!a && /^y|ใช่/i.test(a.trim());
   btns.querySelectorAll('button').forEach(b => { b.disabled = true; if (b.dataset.a === (yes ? 'y' : 'n')) b.classList.add('chosen'); });
   return yes;
@@ -162,7 +166,7 @@ const io = {
   write,
   clear: () => { lines.innerHTML = ''; },
   prompt: (text, opts = {}) => new Promise(resolve => {
-    pending = { resolve, text, hidden: !!opts.hidden };
+    pending = { resolve, text, hidden: !!opts.hidden, yn: !!opts.yn };
     setPrompt();
     input.focus();
   }),
@@ -206,12 +210,23 @@ input.addEventListener('keydown', e => {
 });
 term.addEventListener('click', () => { if (!getSelection().toString()) input.focus(); });
 
+// A command typed while น้องล่าม is still thinking, or instead of answering her (y/n), wins: her advice is dropped and
+// the command runs as soon as the current one finishes (cj's 1-8 bug: `sudo cat exam.txt` was taken as a "no").
+let cutIn = null, thinking = false;
+const YN = /^(y|yes|n|no|ใช่|ไม่|ไม่ใช่)$/i;
+
 async function submit(v) {
+  if (pending?.yn && v.trim() && !YN.test(v.trim())) {
+    cutIn = v;
+    const p = pending; pending = null; setPrompt(); p.resolve(null);
+    return;
+  }
   if (pending) {
     add(esc(pending.text) + (pending.hidden ? '' : esc(v)), 'out');
     const p = pending; pending = null; setPrompt(); p.resolve(v);
     return;
   }
+  if (thinking && v.trim()) { cutIn = v; sys('(ข้ามคำแนะนำของน้องล่าม ไปทำคำสั่งใหม่)'); return; }
   if (busy || building || !L) return;
   const text = v.trim();
   add(promptHTML() + esc(v), 'echo');
@@ -229,7 +244,10 @@ async function submit(v) {
       ai: !!ran?.translated, err: ran?.stderr ? ran.stderr.split('\n').find(Boolean) : null, ms: Date.now() - L.t0 });
   }
   catch (e) { console.error(e); sys('เกมสะดุด: ' + e.message, 'fail'); }
-  finally { busy = false; input.classList.remove('busy'); setPrompt(); input.focus(); }
+  finally {
+    busy = false; input.classList.remove('busy'); setPrompt(); input.focus();
+    if (cutIn) { const t = cutIn; cutIn = null; submit(t); }
+  }
 }
 
 // ---------- level state ----------
@@ -463,9 +481,10 @@ function kedmaneeHint(text) {
 
 async function think(text) {
   const el = note('<span class="dots">🐧 น้องล่ามกำลังคิด</span>', 'thinking');
-  const r = await interpret(aiReq(text));
+  thinking = true;
+  const r = await interpret(aiReq(text)).finally(() => { thinking = false; });
   el.remove();
-  return r;
+  return cutIn ? { cancelled: true } : r;
 }
 
 function showTranslation(r) {
@@ -494,6 +513,7 @@ function lessonCard(r, tag = 'น้องล่ามสอน') {
 
 async function teach(text) {
   const r = await think(text);
+  if (r.cancelled) return;
   if (!r.command) { if (!r.offline) track('untranslated', { lv: L.lv.id, phase: L.lv.phase, said: text }); say('lam', r.reply || 'เรายังไม่เข้าใจ ลองบอกอีกแบบนะ'); return; }
   L.aiUsed++;
   L.lastTaught = r.command;
@@ -503,13 +523,15 @@ async function teach(text) {
 
 async function translateAndRun(text) {
   const r = await think(text);
+  if (r.cancelled) return;
   if (!r.command) { if (!r.offline) track('untranslated', { lv: L.lv.id, phase: L.lv.phase, said: text }); say('lam', r.reply || 'น้องล่ามยังไม่เข้าใจ ลองพูดอีกแบบนะ'); return; }
   L.aiUsed++;
   L.lastTranslated = r.command;
   showTranslation(r);
   if (/(^|[\s|;&])(rm|find\b.*-delete)\b|-delete\b/.test(r.command) && !(await previewDelete(r.command))) return;
   else if (r.confidence < 0.6) {
-    if (!(await ask('lam', `หมายถึง ${r.command} ใช่ไหม?`))) { say('lam', 'โอเค งั้นลองบอกใหม่อีกแบบนะ'); return; }
+    const ok = await ask('lam', `หมายถึง ${r.command} ใช่ไหม?`);
+    if (!ok) { if (ok === false) say('lam', 'โอเค งั้นลองบอกใหม่อีกแบบนะ'); return; }
   }
   await run(r.command, true);
 }
@@ -528,6 +550,7 @@ async function previewDelete(cmd) {
   const list = `<ul class="gone">${top.map(p => `<li>${esc(rel(p))}</li>`).join('')}</ul>`;
   L.looked = true;
   const yes = await ask('lam', `ดูก่อนลบ: คำสั่งนี้จะลบ ${top.length} รายการนี้ ยืนยันไหม?`, list);
+  if (yes === null) return false;   // cut in by a new command
   track('preview_delete', { lv: L.lv.id, phase: L.lv.phase, n: top.length, yes });
   if (yes) return true;
   say('lam', 'ยกเลิกแล้ว ไม่มีอะไรถูกลบ ดีมากที่อ่านก่อน!');
@@ -539,9 +562,10 @@ async function runAndHelp(text) {
   const res = await run(text);
   if (!res || res.code === 0 || L.passed || !res.stderr) return res;
   const el = note('<span class="dots">🐧 น้องล่ามกำลังดูว่าผิดตรงไหน</span>', 'thinking');
-  const r = await interpret({ ...aiReq(text), mode: 'fix', error: res.stderr });
+  thinking = true;
+  const r = await interpret({ ...aiReq(text), mode: 'fix', error: res.stderr }).finally(() => { thinking = false; });
   el.remove();
-  if (r.offline) return res;
+  if (r.offline || cutIn) return res;
   const phase = L.lv.phase;
   const same = r.command && r.command.replace(/\s+/g, ' ').trim() === text.replace(/\s+/g, ' ').trim();
   if (phase === 3 || !r.command || same) {
@@ -552,7 +576,8 @@ async function runAndHelp(text) {
   note(`<span class="tag">น้องล่ามช่วยแก้</span><code class="cmdt">${esc(r.command)}</code>` +
       (r.explain ? `<div class="explain">${esc(r.explain)}</div>` : ''), 'trans');
   if (phase === 2) { say('lam', 'ลองแก้แล้วพิมพ์ใหม่เองนะ'); return res; }
-  if (!(await ask('lam', 'ให้เรารันแบบที่แก้แล้วไหม?'))) { say('lam', 'โอเค ลองแก้เองนะ สู้ๆ!'); return res; }
+  const ok = await ask('lam', 'ให้เรารันแบบที่แก้แล้วไหม?');
+  if (!ok) { if (ok === false) say('lam', 'โอเค ลองแก้เองนะ สู้ๆ!'); return res; }
   L.aiUsed++;
   L.typedReal = false;
   L.lastTranslated = r.command;
