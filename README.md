@@ -1,106 +1,101 @@
-# ล่ามเชลล์ (LamShell)
+# LamShell (ล่ามเชลล์)
 
-**เกมสอนใช้ terminal Linux สำหรับนักเรียนมัธยมไทย** เริ่มจากพิมพ์ภาษาไทยมั่วๆ ได้เลย แล้วตัวช่วยจะค่อยๆ
-ถอยออกไปทีละเฟส จนผู้เล่นพิมพ์คำสั่งจริงและอ่าน error ออกเองได้ เล่นในเบราว์เซอร์ พิมพ์ผิดได้ไม่มีวันพัง
+**A browser game that teaches Thai high-school students the Linux terminal.** Players start by typing messy Thai,
+and the help fades out phase by phase until they type real commands and read errors on their own. Everything runs
+in the browser, so mistakes can never break anything.
 
-![พิมพ์ภาษาไทย น้องล่ามแปลเป็นคำสั่งจริงแล้วรันให้](screenshots/phase1.gif)
+![Typing Thai: น้องล่าม translates it into a real command and runs it](screenshots/phase1.gif)
 
-## แก้ปัญหาอะไร
+## The problem
 
-เกมสอน terminal ที่มีอยู่ (GameShell, OverTheWire Bandit, Terminus ฯลฯ) มีสองแบบ แบบแรกบังคับพิมพ์ syntax
-ให้ถูกตั้งแต่ด่านแรก เด็กที่ไม่เคยเห็นหน้าจอดำจะติดตั้งแต่เริ่ม แบบที่สองใจดีตลอดเกมแต่ไปไม่ถึงคำสั่งจริง
-และไม่มีเกมไหนรับภาษาไทยเลย
+Existing terminal games (GameShell, OverTheWire Bandit, Terminus, ...) come in two kinds. Some demand exact syntax
+from the first level, which stops beginners who have never seen a black screen. Others stay friendly all the way
+through but never reach real commands. None of them accept Thai.
 
-ล่ามเชลล์ใช้คำสั่งหลักชุดเดิม 10 ตัว (`ls cd mkdir cp mv rm cat find sudo poweroff`) วนกลับมาทุกเฟส
-แต่ความเข้มของการพิมพ์ค่อยๆ เพิ่มขึ้น จากภาษาแม่ไปสู่ syntax จริง:
+LamShell brings the same 10 core commands (`ls cd mkdir cp mv rm cat find sudo poweroff`) back in every phase while
+the typing gets stricter, moving from the mother tongue to real syntax:
 
-| เฟส | พิมพ์อะไรได้ | น้องล่าม (ล่ามเพนกวิน) ช่วยแค่ไหน |
+| Phase | What the player types | How much น้องล่าม (the interpreter penguin) helps |
 |---|---|---|
-| 1 | ภาษาไทยมั่วๆ เช่น `ปิดคอมดิ` | AI แปลเป็นคำสั่งจริง โชว์ให้ดู แล้วรันให้ |
-| 2 | ถามเป็นไทย แล้วพิมพ์คำสั่งเอง | สอนทุกส่วนของคำสั่ง แต่ไม่รันให้ |
-| 3 | ชื่อคำสั่งจริง + ส่วนที่เหลือเป็นไทย เช่น `ls ไฟล์ที่ซ่อนอยู่` | แปลแค่ "ไส้ใน" และให้ดูก่อนลบทุกครั้ง |
-| 4 | syntax เป๊ะทุกตัว | ไม่มีคนแปล เหลือสมุดถอดรหัส error หลังปุ่ม |
-| ด่านสะพาน | `\|` `2>/dev/null` `>` `xargs` | ไม่มี |
-| กู้ภัย + บทสุดท้าย | งานจริง `sudo` `./script` ดูก่อนลบ | ไม่มี |
+| 1 | Messy Thai, e.g. `ปิดคอมดิ` ("shut the computer down") | AI translates it, shows the real command, and runs it |
+| 2 | Ask in Thai, then type the command yourself | Explains every part of the command but never runs it |
+| 3 | Real command name + Thai for the rest, e.g. `ls ไฟล์ที่ซ่อนอยู่` | Translates only the arguments and previews every deletion |
+| 4 | Exact syntax | No translation; only an error decoder behind a button |
+| Bridge | `\|` `2>/dev/null` `>` `xargs` | None |
+| Rescue + final act | Real tasks: `sudo`, `./script`, look before you delete | None |
 
-**จุดขาย: เราไม่ได้สอนคำสั่ง เราสอนให้อ่าน error เป็น** ข้อความ error ทุกตัวในเกมตรงกับ GNU coreutils / bash จริง
-แยกเป็น *ใครบ่น / บ่นเรื่องอะไร / เพราะอะไร* พร้อมคำอธิบายภาษาไทยที่ค่อยๆ หายไปตามเฟส
+**The selling point: we don't just teach commands, we teach reading errors.** Every error message is the exact
+GNU coreutils / bash text, split into *who complains / about what / why* with a Thai explanation that fades out
+phase by phase.
 
-## ภาพจากเกม
+## Screenshots
 
 | | |
 |---|---|
-| ![เฟส 4: error จริงและสมุดถอดรหัส](screenshots/phase4-error.jpg) | ![แบบทดสอบเช็กพอยต์ในเทอร์มินัล](screenshots/checkpoint-quiz.jpg) |
-| **เฟส 4** พิมพ์เป๊ะทุกตัว เห็น error แบบเครื่องจริง เปิดสมุดถอดรหัสได้ | **แบบทดสอบเช็กพอยต์** ท้ายเฟส 1-4 ต้องได้ 80% ถึงผ่าน |
-| ![Piki คู่มือคำสั่ง](screenshots/piki.jpg) | ![หน้าครู: ดาวรายด่าน](screenshots/teacher-stars.jpg) |
-| **Piki** สารานุกรมคำสั่งในเกม (ล้อ Wikipedia) | **หน้าครู** ความคืบหน้า ดาวรายด่าน และ log ของทุกคน |
+| ![Phase 4: a real error and the decoder](screenshots/phase4-error.jpg) | ![Checkpoint quiz in the terminal](screenshots/checkpoint-quiz.jpg) |
+| **Phase 4**: exact syntax, real errors, with the decoder notebook | **Checkpoint quiz** after phases 1–4; 80% to pass |
+| ![Piki, the in-game command encyclopedia](screenshots/piki.jpg) | ![Teacher dashboard: stars per level](screenshots/teacher-stars.jpg) |
+| **Piki**: the in-game command encyclopedia (a Wikipedia parody) | **Teacher dashboard**: progress, stars per level, and a log for every student |
 
-## มีอะไรในเกม
+## Features
 
-- **44 ด่านพร้อมเนื้อเรื่อง** ปี 2050 น้องล่ามอยู่ในคอมทุกเครื่อง จนไวรัสมั่วซั่วบุกเครื่องเซิร์ฟเวอร์ของโรงเรียน
-  ผู้เล่นต้องไล่ไวรัส ช่วยครูสมใจ แล้วไปกู้น้องล่ามที่ถูกขัง มีฉากเล่าเรื่อง 3D และเสียงพากย์บทพูดหลักทุกบท
-- **เครื่องเดียวทั้งเกม** ทุกอย่างที่ผู้เล่นทำติดตัวไปด่านต่อไป ความทรงจำของน้องล่ามเขียนจากสิ่งที่ผู้เล่นพิมพ์จริง
-  และถ้าลบสมองน้องล่ามทิ้ง = GAME OVER (เหมือนเครื่องจริง rm ไม่มีถังขยะ)
-- **ตรวจผ่านจากสภาพของเครื่อง** ไม่ได้เทียบตัวอักษร คำตอบที่ถูกจึงมีได้หลายแบบ
-- **ตัวช่วย 3 ขั้น** ลุงภารโรงบอกคำสั่งที่ต้องใช้ → สมุดน้องล่ามถอดรหัส error → พี่รูทเฉลย (ขั้นสูงขึ้นดาวลดลง)
-- **เทียบกับ Windows** ด่านที่มีเรื่องใหม่มีประโยคเทียบกับสิ่งที่เด็กคุ้น เช่น `sudo` = Run as administrator
-- **Piki** คู่มือ 24 หน้า แบ่งตามคำสั่ง อ่านแล้วทำได้ทุกด่านแต่ไม่ใช่เฉลย เพราะตัวอย่างใช้ไฟล์คนละชุดกับในด่าน
-- **บัญชีนักเรียน** สมัครด้วยชื่อผู้ใช้และรหัสผ่าน (เก็บเป็น hash) ต้องกดยอมรับการเก็บข้อมูลก่อน เล่นต่อจากเครื่องไหนก็ได้
-- **หน้าครู** (`/teacher`) ความคืบหน้ารายคน (ใครติดด่านเดิมเกิน 5 นาทีขึ้นเตือน), ดาวรายด่าน, log ทุกอย่างที่พิมพ์,
-  ด่านที่ติดนาน, error ที่เจอบ่อย, ประโยคไทยที่แปลไม่ออก, ผลแบบทดสอบรายข้อ, ดาวน์โหลด CSV
-- **ตัวชี้วัดสำหรับวิจัย** อัตรา error ซ้ำ, อัตราพึ่งตัวแปล, อัตราเปิดสมุดถอดรหัส, อัตราดูก่อนลบ ใช้ตอบคำถามว่า
-  การเริ่มจากภาษาแม่แล้วค่อยๆ ถอดออก ช่วยให้พิมพ์ syntax จริงและอ่าน error ได้ดีขึ้นจริงไหม
+- **44 levels with a story.** In 2050, น้องล่าม lives inside every computer until the virus มั่วซั่ว breaks into the
+  school server. The player drives the virus out, helps ครูสมใจ (the teacher), and finally rescues น้องล่าม. 3D
+  cutscenes and voice acting for every main line.
+- **One machine for the whole game.** Everything the player does carries over to the next level. น้องล่าม's memory
+  files are written from what the player really typed, and deleting her brain means GAME OVER, because on a real
+  machine `rm` has no recycle bin.
+- **Levels pass on the state of the machine**, not on matching the exact text, so any correct answer works.
+- **Three-step hints**: the janitor names the commands → น้องล่าม's notebook decodes the last error → พี่รูท gives
+  the solution (each step lowers the star cap).
+- **Windows comparisons**: levels that introduce something new compare it to what students already know, e.g.
+  `sudo` = Run as administrator.
+- **Piki**, a 24-page command encyclopedia organised by command, not by level. It is enough to solve every level,
+  but its examples use different files from the missions, so it is never a walkthrough.
+- **Student accounts**: username and password (stored hashed), with a consent step before any data is collected.
+  A save continues on any computer.
+- **Teacher dashboard** at `/teacher`: per-student progress (anyone stuck on one level for over 5 minutes is
+  flagged), stars per level, a log of everything typed, slowest levels, the class's most common errors, Thai phrases
+  the interpreter could not translate, per-question quiz results, and a CSV export.
+- **Research metrics**: repeated-error rate, reliance on the translator, decoder use, and look-before-delete rate,
+  to measure whether starting in the mother tongue and fading it out really improves exact syntax and error reading.
 
-## วิธีรัน
+## Running it
 
-ตอนนี้ยังไม่มีเวอร์ชันออนไลน์ ต้องรันบนเครื่องตัวเอง ต้องมี Python 3 และ [Claude Code](https://claude.com/claude-code)
-CLI ที่ล็อกอินแล้ว (ใช้ Claude Haiku แปลภาษาไทยในเฟส 1-3 ไม่ต้องใช้ API key)
+There is no online version yet; it runs locally. It needs Python 3 and a logged-in
+[Claude Code](https://claude.com/claude-code) CLI (Claude Haiku translates Thai in phases 1–3; no API key needed).
 
 ```
-./lamshell            # ครั้งแรกจะถามรหัสผ่านครูใน terminal แล้วเปิดเกมในเบราว์เซอร์
-./lamshell --setup    # เปลี่ยนรหัสครู / เปิดให้เครื่องนักเรียนในห้องเข้าได้ / เปลี่ยนพอร์ต
-# เกม: http://127.0.0.1:4011   หน้าครู: http://127.0.0.1:4011/teacher
+./lamshell            # first run asks for the teacher password in the terminal, then opens the game
+./lamshell --setup    # change the teacher password / allow classroom computers / change the port
+# game: http://127.0.0.1:4011   teacher dashboard: http://127.0.0.1:4011/teacher
 ```
 
-รหัส sudo ในเกม: `pass123` · การตั้งค่าอยู่ใน `config.json` (รหัสผ่านเก็บเป็น hash) และข้อมูลการเล่นอยู่ใน
-`data/lamshell.db` ทั้งสองอย่างไม่อยู่ใน repo
+The in-game sudo password is `pass123`. Settings live in `config.json` (the password only as a hash) and play data
+in `data/lamshell.db`; neither is in the repository.
 
-## โครงสร้าง
+## Project structure
 
-| ไฟล์ | หน้าที่ |
+| File | Purpose |
 |---|---|
-| `static/js/shell.js` | ตัวจำลอง bash ที่เขียนเอง (pipe, redirect, glob, quote, sudo) บนระบบไฟล์ในหน่วยความจำ ข้อความ error ตรงกับ GNU coreutils 9.4 / bash 5.2 |
-| `static/js/levels.js` · `world.js` | 44 ด่าน เครื่องเริ่มต้น และสิ่งที่เนื้อเรื่องเพิ่มเข้ามาในแต่ละด่าน |
-| `static/js/game.js` | การรับคำสั่งตามเฟส ดาว คำใบ้ ตัวถอดรหัส error |
-| `static/js/quiz.js` · `piki.js` | แบบทดสอบเช็กพอยต์ · สารานุกรม Piki |
-| `static/js/stage.js` · `cutscene.js` | ตัวละคร 3D (three.js + three-vrm) และฉากเล่าเรื่อง |
-| `server.py` | เซิร์ฟเวอร์ Python (stdlib ล้วน) ส่งคำขอแปลให้ Claude Haiku และมีตัวกันไม่ให้ AI เติม `sudo` เติมขั้นตอน หรือเปลี่ยนคำสั่งที่ผู้เล่นเลือก |
-| `classroom.py` · `settings.py` | บัญชีนักเรียน หน้าครู ข้อมูลวิจัย (SQLite) · การตั้งค่าใน terminal |
+| `static/js/shell.js` | A bash simulator written from scratch (pipes, redirects, globs, quoting, sudo) over an in-memory filesystem, with errors matching GNU coreutils 9.4 / bash 5.2 |
+| `static/js/levels.js` · `world.js` | The 44 levels, the starting machine, and what the story adds at each level |
+| `static/js/game.js` | Input handling per phase, stars, hints, the error decoder |
+| `static/js/quiz.js` · `piki.js` | Checkpoint quizzes · the Piki encyclopedia |
+| `static/js/stage.js` · `cutscene.js` | 3D characters (three.js + three-vrm) and story cutscenes |
+| `server.py` | Stdlib-only Python server; sends translation requests to Claude Haiku, with guards so the AI never adds `sudo`, adds extra steps, or changes the command the player chose |
+| `classroom.py` · `settings.py` | Student accounts, teacher dashboard and research data (SQLite) · terminal setup |
 
-ประวัติการพัฒนาและเหตุผลของการตัดสินใจแต่ละครั้งอยู่ใน [CHANGELOG.md](CHANGELOG.md)
+The development history, and the reasons behind each design decision, are in [CHANGELOG.md](CHANGELOG.md) (Thai).
 
-## ยังไม่ได้ทำ
+## Not done yet
 
-ตอนจบพิเศษ "ลองบน Linux จริง" (v86 รัน Linux ในเบราว์เซอร์)
-
-โค้ดจะเปิดเป็น open source หลังจบการแข่งขัน
-
-## เครดิต
-
-- ออกแบบเกมและเนื้อเรื่อง: cj ([github.com/cjpsms](https://github.com/cjpsms))
-- ตัวละคร 3D: cj สร้างใน VRoid Studio จากโมเดลตัวอย่างของ VRoid (ข้อตกลง VRoidPreset A-Z: ใช้ได้อิสระ ไม่ใช่ CC0)
-- เสียงพากย์: ElevenLabs (ป้าเซิร์ฟใช้เสียงจาก Gemini TTS) · ฟอนต์ IBM Plex Sans Thai และ Cascadia Mono
-
----
-
-### English
-
-LamShell is a browser game that teaches Thai high-school students the Linux command line. The same 10 core
-commands return in every phase while the typing gets stricter: messy Thai (translated by Claude Haiku) → ask in
-Thai, then type it yourself → real command + Thai arguments → exact syntax → pipes and redirects. Every error message
-is the exact GNU text, decoded into *who complains / about what / why* with Thai help that fades out phase by phase.
-It has a story with 3D cutscenes and voice acting, checkpoint quizzes, an in-game command encyclopedia (Piki),
-student accounts and a teacher dashboard with research metrics. Run it locally with `./lamshell` (Python 3 and a
-logged-in Claude Code CLI).
+A bonus ending that lets players try the same commands on real Linux running in the browser (v86).
 
 The code will be open-sourced after the competition.
+
+## Credits
+
+- Game design and story: cj ([github.com/cjpsms](https://github.com/cjpsms))
+- 3D characters: made by cj in VRoid Studio from VRoid sample models (VRoidPreset A-Z terms: free to use, not CC0)
+- Voice acting: ElevenLabs (ป้าเซิร์ฟ uses a Gemini TTS voice) · Fonts: IBM Plex Sans Thai and Cascadia Mono
