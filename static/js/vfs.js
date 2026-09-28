@@ -95,14 +95,17 @@ export class VFS {
   }
   // Build a subtree from a spec: 'name/' keys are dirs, other keys are files
   // (string content, or { content, size, priv }). '__priv': true marks the dir itself.
-  tree(abs, spec) {
+  // Everything built inside a '__ro' dir is root-owned too (like /etc/passwd), unless the spec says '__ro': false / ro: false.
+  tree(abs, spec, ro = false) {
     const dir = this.mkdirp(abs);
+    if ('__ro' in spec) ro = !!spec.__ro;
+    if (ro) dir.ro = true;
     for (const [k, v] of Object.entries(spec)) {
       if (k === '__priv') { dir.priv = !!v; continue; }
       if (k === '__ro') { dir.ro = !!v; continue; }
-      if (k.endsWith('/')) this.tree(abs + '/' + k.slice(0, -1), v || {});
-      else if (typeof v === 'string') this.write(abs + '/' + k, v);
-      else this.write(abs + '/' + k, v.content || '', v);
+      if (k.endsWith('/')) this.tree(abs + '/' + k.slice(0, -1), v || {}, ro);
+      else if (typeof v === 'string') this.write(abs + '/' + k, v, { ro });
+      else this.write(abs + '/' + k, v.content || '', { ro, ...v });
     }
   }
   remove(abs) {
