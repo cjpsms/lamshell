@@ -84,6 +84,30 @@ Run COMMAND with arguments INITIAL-ARGS and more arguments read from input.
     พิมพ์ข้อความออกมา`,
   man: `man: man คำสั่ง
     เปิดคู่มือของคำสั่ง (ฉบับเกม มีภาษาไทย)`,
+  touch: `Usage: touch [OPTION]... FILE...
+Update the access and modification times of each FILE to the current time.
+
+  touch ชื่อไฟล์   ถ้ายังไม่มี = สร้างไฟล์เปล่า / ถ้ามีแล้ว = แค่อัปเดตเวลา
+  -c              ไม่สร้างไฟล์ใหม่`,
+  rmdir: `Usage: rmdir [OPTION]... DIRECTORY...
+Remove the DIRECTORY(ies), if they are empty.
+
+  rmdir ชื่อ   ลบโฟลเดอร์ ได้เฉพาะโฟลเดอร์ว่าง (มีของอยู่ = Directory not empty)`,
+  head: `Usage: head [OPTION]... [FILE]...
+Print the first 10 lines of each FILE to standard output.
+
+  head ไฟล์        ดู 10 บรรทัดแรก
+  -n 3, -3        ดูแค่ 3 บรรทัดแรก`,
+  tail: `Usage: tail [OPTION]... [FILE]...
+Print the last 10 lines of each FILE to standard output.
+
+  tail ไฟล์        ดู 10 บรรทัดสุดท้าย (เช่นท้าย log)
+  -n 3, -3        ดูแค่ 3 บรรทัดสุดท้าย`,
+  sort: `Usage: sort [OPTION]... [FILE]...
+Write sorted concatenation of all FILE(s) to standard output.
+
+  sort ไฟล์   เรียงบรรทัดตามตัวอักษร
+  -n         เรียงแบบตัวเลข   -r  กลับด้าน   -u  ตัดบรรทัดซ้ำ`,
 };
 
 export const OPERATORS_HELP = `ท่อและถัง:

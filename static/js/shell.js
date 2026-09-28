@@ -1,8 +1,12 @@
-// Simulated bash. Error messages copy GNU coreutils 9.4 / bash 5.2 / findutils 4.9 wording.
+// Simulated bash. Error messages copy GNU coreutils / bash / findutils wording; tests/gnu-errors.mjs checks them against the real ones.
 import { HOME, basename, dirname, normalize, sizeOf, canRead, canWriteDir, canWriteFile } from './vfs.js';
 import { MAN } from './man.js';
 
 export const CORE = ['ls', 'cd', 'mkdir', 'cp', 'mv', 'rm', 'cat', 'find', 'sudo', 'poweroff'];
+// Everyday commands a real Ubuntu has that the game doesn't simulate.
+const NOT_IN_GAME = new Set(['nano', 'vim', 'vi', 'less', 'more', 'chmod', 'chown', 'ln', 'tree', 'uniq', 'diff', 'date', 'history',
+  'apt', 'apt-get', 'ps', 'kill', 'top', 'df', 'du', 'tar', 'zip', 'unzip', 'ping', 'curl', 'wget', 'ssh', 'file', 'stat', 'which', 'su', 'passwd',
+  'python3', 'git', 'uname', 'hostname', 'id', 'env', 'export', 'alias', 'type', 'basename', 'dirname', 'tee', 'cut', 'tr', 'awk', 'sed']);
 const BUILTINS = new Set(['cd', 'pwd', 'echo', 'exit', 'help', 'clear', 'history']);
 
 const C = { dir: '\x1b[1;34m', exe: '\x1b[1;32m', red: '\x1b[1;31m', off: '\x1b[0m' };
@@ -12,6 +16,7 @@ const qa = s => (s.includes("'") ? `"${s}"` : `'${s}'`);
 const qn = s => (/[\s'"\\$`*?\[\]{}()<>|&;!#~]/.test(s) ? qa(s) : s);
 
 class SyntaxErr extends Error {}
+class Incomplete extends Error {}   // line ends in | && || : interactive bash asks for more with "> "
 
 // ---------- tokenizer / parser ----------
 
@@ -29,7 +34,7 @@ function tokenize(line, vars) {
       if (line[i + 1] === '>') { const app = line[i + 2] === '>'; toks.push({ op: 'redir', fd: 'both', app }); i += app ? 3 : 2; continue; }
       toks.push({ op: '&' }); i++; continue;
     }
-    if (c === ';') { toks.push({ op: ';' }); i++; continue; }
+    if (c === ';') { if (line[i + 1] === ';') { toks.push({ op: ';;' }); i += 2; } else { toks.push({ op: ';' }); i++; } continue; }
     if (c === '<') { toks.push({ op: '<' }); i++; continue; }
     if (c === '>' || (c === '2' && line[i + 1] === '>')) {
       let fd = 1;
@@ -90,6 +95,7 @@ function parse(toks) {
       cmd.redirs.push({ fd: t.op === '<' ? 0 : t.fd, app: t.app, target: nx }); k++; continue;
     }
     if (t.op === '2>&1') { cmd.redirs.push({ fd: 2, dup: true }); continue; }
+    if (t.op === ';;') bad(';;');   // only means something inside case, which the game doesn't have
     if (t.op === '|') { endCmd('|'); continue; }
     if (['&&', '||', ';', '&'].includes(t.op)) {
       endCmd(t.op);
@@ -97,7 +103,7 @@ function parse(toks) {
     }
   }
   if (cmd.words.length || cmd.redirs.length) pipe.push(cmd);
-  else if (pipe.length) bad('newline');
+  else if (pipe.length || sep === '&&' || sep === '||') throw new Incomplete();
   if (pipe.length) list.push({ sep, pipe });
   return list;
 }
@@ -158,7 +164,17 @@ export class Shell {
     const traceStart = this.trace.length;
     let list;
     try {
-      list = parse(tokenize(line, { HOME, USER: 'student', PWD: this.cwd, '?': String(this.lastCode) }));
+      for (;;) {
+        try {
+          list = parse(tokenize(line, { HOME, USER: 'student', PWD: this.cwd, '?': String(this.lastCode) }));
+          break;
+        } catch (e) {
+          if (!(e instanceof Incomplete)) throw e;
+          const more = await this.io.prompt('> ');
+          if (more === null || more === undefined) { res.code = this.lastCode = 130; return res; }   // Ctrl-C
+          line = res.line = line + ' ' + more;
+        }
+      }
     } catch (e) {
       if (!(e instanceof SyntaxErr)) throw e;
       this.screenErr(`bash: ${e.message}\n`);
@@ -292,6 +308,10 @@ export class Shell {
           const prog = this.programs[n.prog];
           code = prog ? await prog.call(this, args, ctx, this.abs(name)) : 0;
         }
+      } else if (NOT_IN_GAME.has(name)) {
+        // a real Linux would have it: "command not found" would teach something false
+        ctx.err(`${name}: มีจริงใน Linux แต่เครื่องในเกมนี้ยังไม่มีคำสั่งนี้\n`);
+        code = 127;
       } else {
         ctx.err(`bash: ${name}: command not found\n`);
         code = 127;
@@ -475,7 +495,7 @@ cmds.mkdir = function (args, ctx) {
       let node = this.fs.root, ok = true;
       const parts = abs.split('/').filter(Boolean);
       for (const part of parts) {
-        if (node.t !== 'd') { ctx.err(`mkdir: cannot create directory ${qa(p)}: Not a directory\n`); ok = false; break; }
+        if (node.t !== 'd') { ctx.err(`mkdir: cannot create directory ${qa(fileInWay(this, p))}: Not a directory\n`); ok = false; break; }
         if (!node.kids[part]) {
           if (!canWriteDir(node, ctx.sudo)) { ctx.err(`mkdir: cannot create directory ${qa(p)}: Permission denied\n`); ok = false; break; }
           node.kids[part] = { t: 'd', priv: false, kids: {} };
@@ -495,6 +515,16 @@ cmds.mkdir = function (args, ctx) {
   }
   return code;
 };
+
+// The part of a typed path that is a file, not a folder (mkdir -p a.txt/b -> 'a.txt'), as the player typed it.
+function fileInWay(sh, p) {
+  const parts = p.split('/');
+  for (let k = 1; k <= parts.length; k++) {
+    const pre = parts.slice(0, k).join('/') || '/';
+    if (sh.fs.isFile(sh.abs(pre))) return pre;
+  }
+  return p;
+}
 
 // Resolve "SOURCE... DEST" for cp/mv. Returns { dest, dabs, destDir } or null after printing an error.
 function destOf(sh, name, ops, ctx) {
@@ -524,6 +554,7 @@ cmds.cp = function (args, ctx) {
     if (isDir && !R) { ctx.err(`cp: -r not specified; omitting directory ${qa(src)}\n`); code = 1; continue; }
     const tabs = D.destDir ? normalize(D.dabs + '/' + basename(sabs)) : D.dabs;
     const tdisp = D.destDir ? this.join(D.dest, basename(src)) : D.dest;
+    if (!D.destDir && D.dest.endsWith('/') && this.fs.isFile(D.dabs)) { ctx.err(`cp: cannot stat ${qa(D.dest)}: Not a directory\n`); code = 1; continue; }
     if (!D.destDir && D.dest.endsWith('/') && !isDir) { ctx.err(`cp: cannot create regular file ${qa(D.dest)}: Not a directory\n`); code = 1; continue; }
     if (tabs === sabs) { ctx.err(`cp: ${qa(src)} and ${qa(tdisp)} are the same file\n`); code = 1; continue; }
     if (isDir && tabs.startsWith(sabs + '/')) { ctx.err(`cp: cannot copy a directory, ${qa(src)}, into itself, ${qa(tdisp)}\n`); code = 1; continue; }
@@ -531,6 +562,7 @@ cmds.cp = function (args, ctx) {
     const t = this.fs.lookup(tabs, ctx.sudo);
     const what = isDir ? 'directory' : 'regular file';
     if (t.err === 'EACCES') { ctx.err(`cp: cannot create ${what} ${qa(tdisp)}: Permission denied\n`); code = 1; continue; }
+    if (t.err === 'ENOTDIR') { ctx.err(`cp: cannot stat ${qa(tdisp)}: Not a directory\n`); code = 1; continue; }
     if (t.err && !t.parentOk) { ctx.err(`cp: cannot create ${what} ${qa(tdisp)}: No such file or directory\n`); code = 1; continue; }
     const parent = t.parent;
     if (!canWriteDir(parent, ctx.sudo)) { ctx.err(`cp: cannot create ${what} ${qa(tdisp)}: Permission denied\n`); code = 1; continue; }
@@ -560,11 +592,13 @@ cmds.mv = function (args, ctx) {
     if (s.err) { ctx.err(`mv: cannot stat ${qa(src)}: No such file or directory\n`); code = 1; continue; }
     const tabs = D.destDir ? normalize(D.dabs + '/' + basename(sabs)) : D.dabs;
     const tdisp = D.destDir ? this.join(D.dest, basename(src)) : D.dest;
+    if (!D.destDir && D.dest.endsWith('/') && this.fs.isFile(D.dabs)) { ctx.err(`mv: cannot stat ${qa(D.dest)}: Not a directory\n`); code = 1; continue; }
     if (!D.destDir && D.dest.endsWith('/') && s.node.t !== 'd') { ctx.err(`mv: cannot move ${qa(src)} to ${qa(D.dest)}: Not a directory\n`); code = 1; continue; }
     if (tabs === sabs) { ctx.err(`mv: ${qa(src)} and ${qa(tdisp)} are the same file\n`); code = 1; continue; }
     if (s.node.t === 'd' && tabs.startsWith(sabs + '/')) { ctx.err(`mv: cannot move ${qa(src)} to a subdirectory of itself, ${qa(tdisp)}\n`); code = 1; continue; }
     const t = this.fs.lookup(tabs, ctx.sudo);
     if (t.err === 'EACCES') { ctx.err(`mv: cannot move ${qa(src)} to ${qa(tdisp)}: Permission denied\n`); code = 1; continue; }
+    if (t.err === 'ENOTDIR') { ctx.err(`mv: cannot stat ${qa(tdisp)}: Not a directory\n`); code = 1; continue; }
     if (t.err && !t.parentOk) { ctx.err(`mv: cannot move ${qa(src)} to ${qa(tdisp)}: No such file or directory\n`); code = 1; continue; }
     if (!canWriteDir(s.parent, ctx.sudo) || !canWriteDir(t.parent, ctx.sudo)) { ctx.err(`mv: cannot move ${qa(src)} to ${qa(tdisp)}: Permission denied\n`); code = 1; continue; }
     if (t.node) {
@@ -810,6 +844,119 @@ cmds.wc = function (args, ctx) {
   else width = Math.max(1, ...rows.flatMap(([, c]) => cols.map(k => String(c[k]).length)));
   for (const [label, c] of rows) ctx.out(cols.map(k => String(c[k]).padStart(width)).join(' ') + (label ? ' ' + label : '') + '\n');
   return errs.n ? 1 : 0;
+};
+
+// touch/rmdir/head/tail/sort: not lesson commands, but real ones students try; wording from coreutils 9.
+cmds.touch = function (args, ctx) {
+  const o = this.opts('touch', args, 'c', { '--no-create': 'c' }, ctx);
+  if (o.code !== undefined) return o.code;
+  if (!o.ops.length) { ctx.err("touch: missing file operand\nTry 'touch --help' for more information.\n"); return 1; }
+  let code = 0;
+  for (const p of o.ops) {
+    const r = this.fs.lookup(this.abs(p), ctx.sudo);
+    if (r.node) continue;   // only the timestamp would change
+    if (r.err === 'EACCES') { ctx.err(`touch: cannot touch ${qa(p)}: Permission denied\n`); code = 1; continue; }
+    if (r.err === 'ENOTDIR') { ctx.err(`touch: cannot touch ${qa(p)}: Not a directory\n`); code = 1; continue; }
+    if (!r.parentOk) { ctx.err(`touch: cannot touch ${qa(p)}: No such file or directory\n`); code = 1; continue; }
+    if (o.f.has('c')) continue;
+    if (!canWriteDir(r.parent, ctx.sudo)) { ctx.err(`touch: cannot touch ${qa(p)}: Permission denied\n`); code = 1; continue; }
+    r.parent.kids[r.name] = { t: 'f', priv: false, content: '' };
+  }
+  return code;
+};
+
+cmds.rmdir = function (args, ctx) {
+  const o = this.opts('rmdir', args, 'v', { '--verbose': 'v' }, ctx);
+  if (o.code !== undefined) return o.code;
+  if (!o.ops.length) { ctx.err("rmdir: missing operand\nTry 'rmdir --help' for more information.\n"); return 1; }
+  let code = 0;
+  for (const p of o.ops) {
+    const r = this.fs.lookup(this.abs(p), ctx.sudo);
+    const fail = why => { ctx.err(`rmdir: failed to remove ${qa(p)}: ${why}\n`); code = 1; };
+    if (r.err === 'EACCES') { fail('Permission denied'); continue; }
+    if (r.err === 'ENOTDIR') { fail('Not a directory'); continue; }
+    if (r.err) { fail('No such file or directory'); continue; }
+    if (r.node.t !== 'd') { fail('Not a directory'); continue; }
+    if (!r.parent) { fail('Device or resource busy'); continue; }
+    if (Object.keys(r.node.kids).length) { fail('Directory not empty'); continue; }
+    if (!canWriteDir(r.parent, ctx.sudo)) { fail('Permission denied'); continue; }
+    delete r.parent.kids[r.name];
+    if (o.f.has('v')) ctx.out(`rmdir: removing directory, ${qa(p)}\n`);
+  }
+  return code;
+};
+
+// head/tail: -n N, -nN, -N, --lines=N; several files get "==> name <==" headers like the real ones.
+function headTail(name, sh, args, ctx) {
+  let n = 10;
+  const files = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    let m;
+    if (a === '--help') { ctx.out((MAN[name] || `${name}: ไม่มีคู่มือ`) + '\n'); return 0; }
+    if (a === '-n') {
+      if (i + 1 >= args.length) { ctx.err(`${name}: option requires an argument -- 'n'\nTry '${name} --help' for more information.\n`); return 1; }
+      m = [null, args[++i]];
+    } else m = /^-n(.+)$/.exec(a) || /^--lines=(.*)$/.exec(a) || /^-(\d+)$/.exec(a);
+    if (m) {
+      if (!/^\d+$/.test(m[1])) { ctx.err(`${name}: invalid number of lines: ${qa(m[1])}\n`); return 1; }
+      n = +m[1]; continue;
+    }
+    if (a.startsWith('-') && a !== '-') {
+      const bad = a.startsWith('--') ? `unrecognized option '${a}'` : `invalid option -- '${a[1]}'`;
+      ctx.err(`${name}: ${bad}\nTry '${name} --help' for more information.\n`); return 1;
+    }
+    files.push(a);
+  }
+  const cut = text => {
+    const lines = text.split('\n');
+    if (lines[lines.length - 1] === '') lines.pop();
+    const keep = name === 'head' ? lines.slice(0, n) : n ? lines.slice(-n) : [];
+    return keep.length ? keep.join('\n') + '\n' : '';
+  };
+  if (!files.length) { ctx.out(cut(ctx.stdin || '')); return 0; }
+  let code = 0, first = true;
+  for (const p of files) {
+    let text;
+    if (p === '-') text = ctx.stdin || '';
+    else {
+      const r = sh.fs.lookup(sh.abs(p), ctx.sudo);
+      if (r.err === 'EACCES' || (r.node && !canRead(r.node, ctx.sudo))) { ctx.err(`${name}: cannot open ${qa(p)} for reading: Permission denied\n`); code = 1; continue; }
+      if (r.err === 'ENOTDIR') { ctx.err(`${name}: cannot open ${qa(p)} for reading: Not a directory\n`); code = 1; continue; }
+      if (r.err) { ctx.err(`${name}: cannot open ${qa(p)} for reading: No such file or directory\n`); code = 1; continue; }
+      if (r.node.t === 'd') { ctx.err(`${name}: error reading ${qa(p)}: Is a directory\n`); code = 1; continue; }
+      text = r.node.content;
+    }
+    if (files.length > 1) { ctx.out(`${first ? '' : '\n'}==> ${p === '-' ? 'standard input' : p} <==\n`); first = false; }
+    ctx.out(cut(text));
+  }
+  return code;
+}
+cmds.head = function (args, ctx) { return headTail('head', this, args, ctx); };
+cmds.tail = function (args, ctx) { return headTail('tail', this, args, ctx); };
+
+cmds.sort = function (args, ctx) {
+  const o = this.opts('sort', args, 'rnuf', { '--reverse': 'r', '--numeric-sort': 'n', '--unique': 'u', '--ignore-case': 'f' }, ctx, 2);
+  if (o.code !== undefined) return o.code;
+  let lines = [];
+  const read = text => { const l = text.split('\n'); if (l[l.length - 1] === '') l.pop(); lines.push(...l); };
+  if (!o.ops.length) read(ctx.stdin || '');
+  for (const p of o.ops) {
+    if (p === '-') { read(ctx.stdin || ''); continue; }
+    const r = this.fs.lookup(this.abs(p), ctx.sudo);
+    if (r.err === 'EACCES' || (r.node && !canRead(r.node, ctx.sudo))) { ctx.err(`sort: open failed: ${p}: Permission denied\n`); return 2; }
+    if (r.err === 'ENOTDIR') { ctx.err(`sort: cannot read: ${p}: Not a directory\n`); return 2; }
+    if (r.err) { ctx.err(`sort: cannot read: ${p}: No such file or directory\n`); return 2; }
+    if (r.node.t === 'd') { ctx.err(`sort: read failed: ${p}: Is a directory\n`); return 2; }
+    read(r.node.content);
+  }
+  const key = l => (o.f.has('f') ? l.toLowerCase() : l);
+  const num = l => parseFloat(l) || 0;
+  lines.sort(o.f.has('n') ? (a, b) => num(a) - num(b) || a.localeCompare(b) : (a, b) => key(a).localeCompare(key(b)) || a.localeCompare(b));
+  if (o.f.has('r')) lines.reverse();
+  if (o.f.has('u')) lines = lines.filter((l, i) => i === 0 || key(l) !== key(lines[i - 1]));
+  ctx.out(lines.length ? lines.join('\n') + '\n' : '');
+  return 0;
 };
 
 cmds.xargs = async function (args, ctx) {

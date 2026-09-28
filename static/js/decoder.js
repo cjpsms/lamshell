@@ -42,7 +42,7 @@ export function decode(line) {
 
   // Split "who: [cmd: ] what: reason"
   let who = '', rest = line;
-  let m = /^(bash|sudo): (cd): (.*)$/.exec(line) || /^(bash|sudo|ls|cat|mkdir|cp|mv|rm|find|grep|wc|xargs|head|sort|chmod): (.*)$/.exec(line);
+  let m = /^(bash|sudo): (cd): (.*)$/.exec(line) || /^(bash|sudo|ls|cat|mkdir|cp|mv|rm|find|grep|wc|xargs|head|tail|sort|touch|rmdir|chmod): (.*)$/.exec(line);
   if (m) {
     if (m.length === 4) { who = `${m[1]} (${m[2]})`; rest = m[3]; } else { who = m[1]; rest = m[2]; }
   } else if (/^(Sorry|Failed to power|Usage:)/.test(line)) {
