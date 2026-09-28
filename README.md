@@ -1,5 +1,7 @@
 # LamShell (ล่ามเชลล์)
 
+[ภาษาไทย](README.th.md) · **Play online: https://cjpsms.github.io/lamshell/** (dictionary mode, nothing saved)
+
 **A browser game that teaches Thai high-school students the Linux terminal.** Players start by typing messy Thai,
 and the help fades out phase by phase until they type real commands and read errors on their own. Everything runs
 in the browser, so mistakes can never break anything.
@@ -62,17 +64,24 @@ phase by phase.
 
 ## Running it
 
-There is no online version yet; it runs locally. It needs Python 3 and a logged-in
-[Claude Code](https://claude.com/claude-code) CLI (Claude Haiku translates Thai in phases 1–3; no API key needed).
+**Online:** https://cjpsms.github.io/lamshell/ runs the whole game in the browser with no server. Thai is translated
+by the game's built-in phrase dictionary (everyday sentences like "ดูไฟล์", "เข้าห้องพักครู", "ก๊อปการบ้านไปไว้ใน backup"),
+and progress stays in that browser. Accounts, the teacher dashboard and AI translation need the local server.
+
+**Locally** (full version): Python 3, then
 
 ```
-./lamshell            # first run asks for the teacher password in the terminal, then opens the game
-./lamshell --setup    # change the teacher password / allow classroom computers / change the port
+./lamshell            # first run asks for the settings in the terminal, then opens the game
+./lamshell --setup    # teacher password / classroom network access / port / which AI translates Thai
 # game: http://127.0.0.1:4011   teacher dashboard: http://127.0.0.1:4011/teacher
 ```
 
-The in-game sudo password is `pass123`. Settings live in `config.json` (the password only as a hash) and play data
-in `data/lamshell.db`; neither is in the repository.
+The AI that translates Thai is chosen in setup: the [Claude Code](https://claude.com/claude-code) CLI (default, no
+API key), the Anthropic API (`pip install anthropic`), OpenAI, Google Gemini or OpenRouter (with that provider's API
+key). Without a working AI the game falls back to the built-in dictionary, so it always stays playable.
+
+The in-game sudo password is `pass123`. Settings live in `config.json` (the teacher password only as a hash, plus the
+AI provider and key) and play data in `data/lamshell.db`; neither is in the repository.
 
 ## Project structure
 
@@ -83,7 +92,8 @@ in `data/lamshell.db`; neither is in the repository.
 | `static/js/game.js` | Input handling per phase, stars, hints, the error decoder |
 | `static/js/quiz.js` · `piki.js` | Checkpoint quizzes · the Piki encyclopedia |
 | `static/js/stage.js` · `cutscene.js` | 3D characters (three.js + three-vrm) and story cutscenes |
-| `server.py` | Stdlib-only Python server; sends translation requests to Claude Haiku, with guards so the AI never adds `sudo`, adds extra steps, or changes the command the player chose |
+| `server.py` · `providers.py` | Stdlib-only Python server; sends translation requests to the chosen AI, with guards so it never adds `sudo`, adds extra steps, or changes the command the player chose |
+| `static/js/offline.js` | The built-in phrase dictionary used when no AI is available (the online version) |
 | `classroom.py` · `settings.py` | Student accounts, teacher dashboard and research data (SQLite) · terminal setup |
 
 The development history, and the reasons behind each design decision, are in [CHANGELOG.md](CHANGELOG.md) (Thai).
@@ -92,7 +102,7 @@ The development history, and the reasons behind each design decision, are in [CH
 
 A bonus ending that lets players try the same commands on real Linux running in the browser (v86).
 
-The code will be open-sourced after the competition.
+Source is public for review. © 2026 cjpsms, all rights reserved. A license will be added after the competition.
 
 ## Credits
 
