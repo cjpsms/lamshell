@@ -83,9 +83,7 @@ CLI ที่ล็อกอินแล้ว (ใช้ Claude Haiku แปล
 
 ตอนจบพิเศษ "ลองบน Linux จริง" (v86 รัน Linux ในเบราว์เซอร์)
 
-## ไลเซนส์
-
-ตอนนี้ยังไม่มีไลเซนส์ หลังนำโครงงานไปแข่งขันแล้วจะเปิดเป็นโอเพนซอร์ส
+โค้ดจะเปิดเป็น open source หลังจบการแข่งขัน
 
 ## เครดิต
 
@@ -105,4 +103,4 @@ It has a story with 3D cutscenes and voice acting, checkpoint quizzes, an in-gam
 student accounts and a teacher dashboard with research metrics. Run it locally with `./lamshell` (Python 3 and a
 logged-in Claude Code CLI).
 
-No license yet: the project will be open-sourced after the competition.
+The code will be open-sourced after the competition.
