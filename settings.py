@@ -16,7 +16,7 @@ from pathlib import Path
 
 PATH = Path(__file__).resolve().parent / "config.json"
 ITERATIONS = 200_000
-DEFAULTS = {"host": "127.0.0.1", "port": 4011, "teacher": None}
+DEFAULTS = {"host": "127.0.0.1", "port": 4011, "teacher": None, "ai": None}
 
 
 def load():
@@ -69,6 +69,31 @@ def _ask(prompt, default=""):
     return v or str(default)
 
 
+def ask_ai(old):
+    """Which AI translates Thai (see providers.py). The key is stored in config.json (chmod 600), or left empty to use
+    the provider's environment variable."""
+    import providers
+    names = list(providers.PROVIDERS)
+    cur = old.get("provider") or "claude-cli"
+    print("AI ที่ใช้แปลภาษาไทย (ไม่มี AI ก็เล่นได้ เกมจะใช้พจนานุกรมในตัวแทน):")
+    for i, n in enumerate(names, 1):
+        print(f"  {i}) {providers.PROVIDERS[n]['label']}{' (ไม่ต้องใช้ key)' if n == 'claude-cli' else ''}")
+    while True:
+        pick = _ask("เลือก", names.index(cur) + 1 if cur in names else 1)
+        if pick.isdigit() and 1 <= int(pick) <= len(names):
+            break
+        print(f"  พิมพ์เลข 1-{len(names)}")
+    provider = names[int(pick) - 1]
+    spec = providers.PROVIDERS[provider]
+    model = _ask("model", old.get("model") if provider == cur and old.get("model") else spec["model"])
+    key = old.get("key") if provider == cur else None
+    if spec["env"]:
+        hint = "Enter = ใช้ key เดิม" if key else f"Enter = ใช้ตัวแปร {spec['env']}"
+        typed = getpass.getpass(f"API key ({hint}): ").strip()
+        key = typed or key
+    return {"provider": provider, "model": model, "key": key or None}
+
+
 def setup():
     """Interactive setup in the terminal. Enter keeps the current value."""
     old = load() if exists() else dict(DEFAULTS)
@@ -93,8 +118,9 @@ def setup():
             continue
         teacher = hash_password(pw)
         break
+    ai = ask_ai(old.get("ai") or {})
     changed_pw = teacher is not old.get("teacher")
-    save({"host": host, "port": int(port), "teacher": teacher})
+    save({"host": host, "port": int(port), "teacher": teacher, "ai": ai})
     print(f"บันทึกแล้ว: {PATH}  (รหัสผ่านเก็บเป็น hash อ่านย้อนกลับไม่ได้)")
     ip = lan_ip() if host == "0.0.0.0" else None
     print(f"หน้าครู: http://127.0.0.1:{port}/teacher" + (f"   นักเรียนเข้าที่: http://{ip}:{port}/" if ip else ""))

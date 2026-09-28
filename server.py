@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""LamShell game server: serves static/ and interprets player input with Claude Haiku.
+"""LamShell game server: serves static/ and interprets player input with an AI (providers.py).
 
-Stdlib only. Haiku runs through the `claude -p` CLI (Pro subscription, no API key).
+Stdlib only. The default AI is Claude Haiku through the `claude -p` CLI (subscription, no API key); `lamshell --setup`
+can switch to the Anthropic API, OpenAI, Google Gemini or OpenRouter.
 """
 import csv
 import io
 import json
 import os
 import re
-import shutil
-import subprocess
 import sys
 import threading
 import time
@@ -19,13 +18,13 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import classroom
+import providers
 import settings
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 LOG_DIR = ROOT / "logs"
 
-MODEL = "haiku"
 
 SYSTEM_PROMPT = """คุณคือ "น้องล่าม" ภูตเพนกวินตัวจิ๋วที่อาศัยอยู่ใน shell ของเครื่อง "ป้าเซิร์ฟ" ในเกมสอน Linux สำหรับนักเรียนมัธยมไทย
 หน้าที่: แปล "สิ่งที่นักเรียนพิมพ์" ให้เป็นคำสั่ง bash จริงหนึ่งบรรทัด
@@ -127,39 +126,17 @@ def strip_json(text: str) -> dict:
     return json.loads(m.group(0) if m else t)
 
 
-def ask_claude(user_msg: str, system: str = SYSTEM_PROMPT) -> dict:
-    cmd = [
-        "claude", "-p", "--model", MODEL,
-        "--tools", "",
-        "--setting-sources", "",
-        "--strict-mcp-config",
-        "--disable-slash-commands",
-        "--no-session-persistence",
-        "--output-format", "json",
-        "--system-prompt", system,
-        user_msg,
-    ]
-    env = {
-        **os.environ,
-        "MAX_THINKING_TOKENS": "0",
-        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-        "DISABLE_AUTOUPDATER": "1",
-        "DISABLE_TELEMETRY": "1",
-        "DISABLE_ERROR_REPORTING": "1",
-    }
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=90, cwd=str(Path.home()),
-                       env=env, stdin=subprocess.DEVNULL)
-    if r.returncode != 0:
-        raise RuntimeError(f"claude rc={r.returncode}: {(r.stderr or r.stdout).strip()[:300]}")
-    envl = json.loads(r.stdout)
-    if envl.get("is_error"):
-        raise RuntimeError(f"claude error: {envl.get('result')}")
-    return strip_json(envl.get("result", ""))
+def ask_ai(user_msg: str, system: str = SYSTEM_PROMPT) -> dict:
+    """The configured AI (providers.py), JSON parsed out of its reply."""
+    return strip_json(providers.ask(providers.current(settings.load()), system, user_msg))
 
 
 def ai_available() -> bool:
-    return shutil.which("claude") is not None
-    return False
+    return providers.available(providers.current(settings.load()))
+
+
+def ai_label() -> str:
+    return providers.label(providers.current(settings.load()))
 
 
 SUDO_WORDS = re.compile(r"sudo|สิทธิ์|สิทธิ|แอดมิน|admin|root|รูท|ผู้ดูแล", re.I)
@@ -247,7 +224,7 @@ def interpret(req: dict) -> dict:
     if hit:
         log_input(req, hit, 0, True)
         return hit
-    raw = ask_claude(user_msg, FIX_PROMPT if req.get("mode") == "fix" else SYSTEM_PROMPT)
+    raw = ask_ai(user_msg, FIX_PROMPT if req.get("mode") == "fix" else SYSTEM_PROMPT)
     res = sanitize(raw, req)
     CACHE.put(key, res)
     log_input(req, res, int((time.time() - t0) * 1000), False)
@@ -306,7 +283,7 @@ class Handler(SimpleHTTPRequestHandler):
         path, _, qs = self.path.partition("?")
         params = {k: urllib.parse.unquote_plus(v) for k, v in (p.partition("=")[::2] for p in qs.split("&") if p)}
         if path == "/api/health":
-            return self.send_json({"ok": True, "ai": ai_available(), "model": MODEL})
+            return self.send_json({"ok": True, "ai": ai_available(), "model": ai_label()})
         if path == "/api/teacher/status":
             return self.send_json({"set": bool(settings.load().get("teacher")), "in": self.teacher()})
         if path.startswith("/api/teacher/") and not self.teacher():
@@ -397,7 +374,7 @@ def main():
     host, port = cfg["host"], cfg["port"]
     srv = ThreadingHTTPServer((host, port), Handler)
     lan = f"  นักเรียนเข้าที่ http://{settings.lan_ip()}:{port}/" if host == "0.0.0.0" and settings.lan_ip() else ""
-    print(f"LamShell on http://{host}:{port}{lan}  (AI: {MODEL}, claude CLI found={ai_available()})", flush=True)
+    print(f"LamShell on http://{host}:{port}{lan}  (AI: {ai_label()}, ready={ai_available()})", flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
