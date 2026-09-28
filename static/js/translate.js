@@ -1,6 +1,7 @@
 // Turns what the player typed into a real command via Claude Haiku (/api/interpret -> server.py -> claude CLI).
 // Without a server or AI (e.g. the web demo) it falls back to the phrase dictionary in offline.js.
 import { offlineInterpret } from './offline.js';
+import { session } from './account.js';
 
 // ---------- Kedmanee (Thai) keyboard -> QWERTY, for "forgot to switch language" ----------
 const KED = {
@@ -45,7 +46,7 @@ export async function interpret(req) {
     const r = await fetch('api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req),
+      body: JSON.stringify(session?.token ? { ...req, token: session.token } : req),
       signal: AbortSignal.timeout(60000),
     });
     const j = await r.json();

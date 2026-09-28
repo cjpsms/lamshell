@@ -139,8 +139,10 @@ def ai_label() -> str:
     return providers.label(providers.current(settings.load()))
 
 
-SUDO_WORDS = re.compile(r"sudo|สิทธิ์|สิทธิ|แอดมิน|admin|root|รูท|ผู้ดูแล", re.I)
-ALLOWED = {"ls", "cd", "pwd", "mkdir", "cp", "mv", "rm", "cat", "find", "sudo", "poweroff", "grep", "wc", "echo", "xargs"}
+# รูท but not the รูท inside ครูที่/ครูทำ/ครูทุก (a Thai vowel or tone mark right after it = another word)
+SUDO_WORDS = re.compile(r"sudo|สิทธิ์|สิทธิ|แอดมิน|admin|root|(?<!ค)รูท(?![\u0E30-\u0E3A\u0E47-\u0E4E])|ผู้ดูแล", re.I)
+ALLOWED = {"ls", "cd", "pwd", "mkdir", "cp", "mv", "rm", "cat", "find", "sudo", "poweroff", "grep", "wc", "echo", "xargs",
+           "touch", "rmdir", "head", "tail", "sort"}
 
 
 def sanitize(out: dict, req: dict) -> dict:
@@ -216,7 +218,7 @@ def log_input(req: dict, res: dict, ms: int, cached: bool):
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def interpret(req: dict) -> dict:
+def interpret(req: dict, who: str = "") -> dict:
     user_msg = build_user_msg(req)
     key = user_msg
     t0 = time.time()
@@ -224,11 +226,47 @@ def interpret(req: dict) -> dict:
     if hit:
         log_input(req, hit, 0, True)
         return hit
+    if who and AI_CALLS.too_many(who):
+        return {"error": "rate", "wait": AI_CALLS.wait(who)}   # the browser falls back to the offline dictionary
     raw = ask_ai(user_msg, FIX_PROMPT if req.get("mode") == "fix" else SYSTEM_PROMPT)
     res = sanitize(raw, req)
     CACHE.put(key, res)
     log_input(req, res, int((time.time() - t0) * 1000), False)
     return res
+
+
+class Window:
+    """Counts hits per key in sliding time windows: too_many(key) is True once any (limit, seconds) is used up."""
+    def __init__(self, *limits):
+        self.limits, self.hits, self.lock = limits, {}, threading.Lock()
+
+    def too_many(self, key, add=True):
+        now = time.time()
+        longest = max(s for _, s in self.limits)
+        with self.lock:
+            hits = [t for t in self.hits.get(key, []) if now - t < longest]
+            full = any(sum(1 for t in hits if now - t < s) >= n for n, s in self.limits)
+            if add and not full:
+                hits.append(now)
+            self.hits[key] = hits
+            return full
+
+    def wait(self, key):
+        """Seconds until key may try again."""
+        now = time.time()
+        with self.lock:
+            hits = self.hits.get(key, [])
+            return max([int(s - (now - hits[-n])) + 1 for n, s in self.limits if len(hits) >= n] or [0])
+
+    def clear(self, key):
+        with self.lock:
+            self.hits.pop(key, None)
+
+
+# One student (or one guest machine) can't burn the AI quota: AI calls per minute / per hour. Cache hits are free.
+AI_CALLS = Window((20, 60), (300, 3600))
+# Password guessing (teacher and student logins): 5 wrong tries per machine per 10 minutes.
+BAD_LOGINS = Window((5, 600))
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -314,7 +352,23 @@ class Handler(SimpleHTTPRequestHandler):
         path = self.path.partition("?")[0]
         try:
             if path == "/api/interpret":
-                return self.send_json(interpret(self.body()))
+                req = self.body()
+                # a signed-in student is limited per account, a guest per machine
+                code = classroom.who(req.pop("token", None))
+                res = interpret(req, f"s:{code}" if code else f"ip:{self.client_address[0]}")
+                return self.send_json(res, 429 if res.get("error") == "rate" else 200)
+            if path in ("/api/signup", "/api/login", "/api/teacher/login"):
+                ip = self.client_address[0]
+                if BAD_LOGINS.too_many(ip, add=False):
+                    mins = -(-BAD_LOGINS.wait(ip) // 60)
+                    return self.send_json({"error": f"ใส่รหัสผิดหลายครั้งเกินไป ลองใหม่อีก {mins} นาที"}, 429)
+            if path == "/api/teacher/login":
+                tok = classroom.teacher_login(self.body().get("password"))
+                if not tok:
+                    BAD_LOGINS.too_many(self.client_address[0])
+                    return self.send_json({"error": "รหัสผ่านไม่ถูกต้อง"}, 401)
+                BAD_LOGINS.clear(self.client_address[0])
+                return self.set_session(tok, {"ok": True})
             if path in ("/api/signup", "/api/login"):
                 req = self.body()
                 try:
@@ -324,7 +378,11 @@ class Handler(SimpleHTTPRequestHandler):
                     else:
                         me = classroom.login(req.get("username"), req.get("password"))
                 except classroom.AccountError as e:
+                    if path == "/api/login":
+                        BAD_LOGINS.too_many(self.client_address[0])
                     return self.send_json({"error": str(e)}, 400)
+                if path == "/api/login":
+                    BAD_LOGINS.clear(self.client_address[0])
                 return self.send_json(me)
             if path == "/api/me":
                 code = classroom.who(self.body().get("token"))
@@ -337,9 +395,6 @@ class Handler(SimpleHTTPRequestHandler):
                 if path == "/api/state":
                     return self.send_json({"ok": True, "updated": classroom.save_state(code, req.get("data") or {})})
                 return self.send_json({"ok": True, "n": classroom.add_events(code, req.get("events") or [])})
-            if path == "/api/teacher/login":
-                tok = classroom.teacher_login(self.body().get("password"))
-                return self.set_session(tok, {"ok": True}) if tok else self.send_json({"error": "รหัสผ่านไม่ถูกต้อง"}, 401)
             if path == "/api/teacher/logout":
                 classroom.end_session(self.cookie("lamteach"))
                 return self.set_session(None, {"ok": True})

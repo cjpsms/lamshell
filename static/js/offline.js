@@ -11,9 +11,10 @@ const PLACES = {
   'ห้องเซิร์ฟเวอร์': 'server_room', 'เซิร์ฟเวอร์': 'server_room', 'ห้องสอบ': 'exam_room2', 'ตู้เซฟ': 'vault',
   'ที่หลบภัย': 'backup', 'อัลบั้ม': 'photos', 'รูปภาพ': 'photos', 'โครงงาน': 'projects',
   'ดาวน์โหลด': 'Downloads', 'บันทึก': 'notes', 'รายงาน': 'report.txt', 'คะแนน': 'scores.csv', 'จดหมาย': 'letter.txt',
-  'การบ้าน': 'homework.txt', 'ข้อสอบ': 'exam.txt', 'รูปรุ่น': 'class_photo.jpg', 'ไวรัส': 'virus.exe', 'log': 'system.log',
+  'การบ้าน': 'homework.txt', 'ข้อสอบ': 'exam.txt', 'รูปรุ่น': 'class_photo.jpg', 'เกรด': 'grades.txt', 'ไวรัส': 'virus.exe', 'log': 'system.log',
 };
-const SUDO = /sudo|สิทธิ์|สิทธิ|แอดมิน|admin|root|รูท|ผู้ดูแล/i;
+// รูท but not the รูท inside ครูที่/ครูทำ/ครูทุก (a Thai vowel or tone mark right after it = another word).
+const SUDO = /sudo|สิทธิ์|สิทธิ|แอดมิน|admin|root|(?<!ค)รูท(?![\u0E30-\u0E3A\u0E47-\u0E4E])|ผู้ดูแล/i;
 
 const GLOSS = {
   ls: 'list = ดูรายชื่อของในห้อง', cd: 'change directory = ย้ายไปอยู่ห้องอื่น', cat: 'แสดงเนื้อหาไฟล์บนจอ',
@@ -51,6 +52,11 @@ function namesIn(text, req, T) {
     const at = text.indexOf(th);
     if (at >= 0 && !Object.keys(aliases).some(k => k !== th && k.includes(th) && text.includes(k))) add(en, at);
   }
+  // "รูป" / "วิดีโอ" with no name: the one picture/video in this room, if there is exactly one.
+  for (const [re, ext] of [[/รูป(?!ภาพ|รุ่น)/, /\.(jpe?g|png|gif)$/i], [/วิดีโอ|วีดีโอ|คลิป/, /\.(mp4|mkv|mov)$/i]]) {
+    const m = re.exec(text), hits = T.top.filter(e => !e.dir && ext.test(e.name));
+    if (m && hits.length === 1) add(hits[0].name, m.index);
+  }
   for (const m of text.matchAll(/[A-Za-z0-9_.~\-/"]+[A-Za-z0-9_.~\-/"]*/g)) {
     const w = m[0].replace(/"/g, '');
     if (/^(sudo|ls|cd|cat|mkdir|cp|mv|rm|find|pwd|poweroff|mb|m|gb|copy|move|delete|remove|search|list|go|read|into|to|in|all|hidden|file|files|folder|home|back|new|make|create|please|the|a)$/i.test(w) || /^\d+$/.test(w) || /^-/.test(w)) continue;
@@ -75,8 +81,10 @@ function intent(raw, req) {
   const r = (flag, name) => (req.phase === 1 && isDir(T, name) ? flag : '');
 
   if (/ปิด\s*(คอม|เครื่อง)|ดับเครื่อง|shut\s*down|power\s*off|ปิดคอม/.test(text)) return sudo + 'poweroff';
-  if (/อยู่(ที่)?ไหน|ที่อยู่ตอนนี้|ตำแหน่ง/.test(text)) return 'pwd';
-  if (/หา|ค้น|search|find/.test(text)) {
+  // "เราอยู่ไหน" = pwd, but "ไฟล์เกรดอยู่ไหน" asks where a thing is = find
+  const where = /อยู่(ที่)?ไหน|ที่อยู่ตอนนี้|ตำแหน่ง/.test(text);
+  if (where && !names.length && !/ไฟล์|โฟลเดอร์/.test(text)) return 'pwd';
+  if (where || /หา|ค้น|search|find/.test(text)) {
     const mb = sizeOver(text);
     if (mb) return `${sudo}find . -type f -size +${mb}M`;
     const word = (text.match(/[a-z0-9_]{2,}/g) || []).find(w => !/^(find|search|mb)$/.test(w)) ||
@@ -93,7 +101,10 @@ function intent(raw, req) {
     const all = /ทั้งโฟลเดอร์|ทั้งหมด|ทั้งตู้|ทั้งห้อง/.test(text) || r('-r', first);
     return `${sudo}cp ${all ? '-r ' : ''}${quote(first)} ${quote(last)}${isDir(T, last) ? '/' : ''}`;
   }
-  if (/ย้าย|move/.test(text) && names.length >= 2) return `${sudo}mv ${quote(first)} ${quote(last)}${isDir(T, last) ? '/' : ''}`;
+  if (/ย้าย|move|เอา.*ไป(ใส่|ไว้|เก็บ)|เก็บ.*(ไว้)?(ใน|ที่)/.test(text)) {
+    // a move with only one name must not fall through to "ไป" = cd
+    return names.length >= 2 ? `${sudo}mv ${quote(first)} ${quote(last)}${isDir(T, last) ? '/' : ''}` : null;
+  }
   if (/ลบ|ทิ้ง|กำจัด|delete|remove/.test(text)) {
     const mb = sizeOver(text);
     if (mb) {
@@ -109,7 +120,7 @@ function intent(raw, req) {
   if (first && first.startsWith('/') && /เข้า|ไป|cd|go/.test(text)) return `cd ${quote(first)}`;   // a full path
   if (/กลับบ้าน|ไปบ้าน|\bhome\b/.test(text) && !/\//.test(text)) return 'cd ~';
   if (/ถอย|ออกไป|ออกจาก|ย้อนกลับ|ขึ้นไปชั้น|back/.test(text) && !first) return 'cd ..';
-  if (/เข้า|ไปที่|ไปห้อง|เดินไป|ไป|go/.test(text) && first) return `cd ${quote(first)}`;
+  if (/เข้า|ไปที่|ไปห้อง|เดินไป|ไป|go/.test(text) && first && !T.top.some(e => e.name === first && !e.dir)) return `cd ${quote(first)}`;
   if (/ดู|มีอะไร|มีไร|อะไรบ้าง|มีไฟล์|รายชื่อ|list|แสดง|ส่อง|ของในห้อง/.test(text)) {
     if (first && /เปิด|อ่าน/.test(text)) return `${sudo}cat ${quote(first)}`;
     const opts = (/ซ่อน|hidden/.test(text) ? 'a' : '') + (/ละเอียด|ขนาด/.test(text) ? 'l' : '');
