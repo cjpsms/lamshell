@@ -26,9 +26,11 @@ the typing gets stricter, moving from the mother tongue to real syntax:
 | Bridge | `\|` `2>/dev/null` `>` `xargs` | None |
 | Rescue + final act | Real tasks: `sudo`, `./script`, look before you delete | None |
 
-**The selling point: we don't just teach commands, we teach reading errors.** Every error message is the exact
-GNU coreutils / bash text, split into *who complains / about what / why* with a Thai explanation that fades out
-phase by phase.
+**The selling point: we don't just teach commands, we teach reading errors.** The error messages are written to
+match real GNU coreutils / bash: `tests/gnu-errors.mjs` runs 94 mistakes (wrong names, missing operands, permissions,
+files used as folders, syntax errors, ...) both in the game and in real bash, and all 94 print the same error
+(tested against coreutils 9.11 / bash 5.3 / findutils 4.11). Cases outside that test may still differ. Each error
+is split into *who complains / about what / why* with a Thai explanation that fades out phase by phase.
 
 ## Screenshots
 
@@ -87,7 +89,8 @@ AI provider and key) and play data in `data/lamshell.db`; neither is in the repo
 
 | File | Purpose |
 |---|---|
-| `static/js/shell.js` | A bash simulator written from scratch (pipes, redirects, globs, quoting, sudo) over an in-memory filesystem, with errors matching GNU coreutils 9.4 / bash 5.2 |
+| `static/js/shell.js` | A bash simulator written from scratch (pipes, redirects, globs, quoting, sudo) over an in-memory filesystem; error text written to match GNU coreutils / bash |
+| `tests/gnu-errors.mjs` | Runs 94 error cases in the game and in real bash, compares the text (`deno run --allow-read --allow-write --allow-run tests/gnu-errors.mjs`) |
 | `static/js/levels.js` · `world.js` | The 44 levels, the starting machine, and what the story adds at each level |
 | `static/js/game.js` | Input handling per phase, stars, hints, the error decoder |
 | `static/js/quiz.js` · `piki.js` | Checkpoint quizzes · the Piki encyclopedia |
