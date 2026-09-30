@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ล่ามเชลล์ · ครู</title>
+<title>ล่ามเชลล์ ครู</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%230b62c4'/><text x='16' y='23' font-size='18' font-family='monospace' fill='white' text-anchor='middle'>&gt;_</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Cascadia+Mono:wght@400;700&family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="teacher.css">
@@ -11,7 +11,7 @@
 <body>
 <div id="auth" class="auth" hidden>
   <form>
-    <h1>หน้าครู · ล่ามเชลล์</h1>
+    <h1>ล่ามเชลล์</h1>
     <p class="muted" id="authmsg"></p>
     <input type="password" name="pw" placeholder="รหัสผ่านครู" autocomplete="current-password">
     <div class="err"></div>
@@ -21,24 +21,24 @@
 
 <div id="app" hidden>
   <header>
-    <b class="brand">ล่ามเชลล์ <span>หน้าครู</span></b>
-    <input id="search" type="search" placeholder="ค้นหาชื่อนักเรียน" autocomplete="off">
+    <b class="brand">ล่ามเชลล์</b>
+    <input id="search" type="search" placeholder="ค้นหาชื่อ" autocomplete="off">
     <span id="updated" class="muted"></span>
-    <a id="csv" href="api/teacher/export.csv">ดาวน์โหลด CSV</a>
+    <a id="csv" href="api/teacher/export.csv">CSV</a>
     <button id="logout" class="link">ออกจากระบบ</button>
   </header>
   <div class="body">
     <nav>
-      <a href="#live">ห้องเรียนสด</a>
+      <a href="#live">ห้องเรียน</a>
       <a href="#people">นักเรียน</a>
-      <a href="#stars">ดาวรายด่าน</a>
-      <a href="#log">log</a>
-      <span class="navsep">สถิติทั้งห้อง</span>
-      <a href="#levels">รายด่าน</a>
-      <a href="#errors">error ที่เจอบ่อย</a>
-      <a href="#thai">ประโยคที่แปลไม่ออก</a>
+      <a href="#stars">คะแนน</a>
+      <a href="#log">ประวัติ</a>
+      <span class="navsep"></span>
+      <a href="#levels">ด่าน</a>
+      <a href="#errors">error</a>
+      <a href="#thai">แปลไม่ออก</a>
       <a href="#quiz">แบบทดสอบ</a>
-      <a href="#research">ตัวชี้วัดวิจัย</a>
+      <a href="#research">ตัวชี้วัด</a>
     </nav>
     <main id="view"></main>
   </div>
