@@ -23,7 +23,7 @@ PROVIDERS = {
     "claude-cli": {"label": "Claude Code CLI", "model": "haiku", "env": None},
     "anthropic": {"label": "Anthropic API", "model": "claude-haiku-4-5", "env": "ANTHROPIC_API_KEY"},
     "openai": {"label": "OpenAI", "model": "gpt-4o-mini", "env": "OPENAI_API_KEY"},
-    "google": {"label": "Google Gemini", "model": "gemini-2.5-flash", "env": "GEMINI_API_KEY"},
+    "google": {"label": "Google Gemini", "model": "gemini-2.5-flash-lite", "env": "GEMINI_API_KEY"},
     "openrouter": {"label": "OpenRouter", "model": "openai/gpt-4o-mini", "env": "OPENROUTER_API_KEY"},
 }
 TIMEOUT = 90
