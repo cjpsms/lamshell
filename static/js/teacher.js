@@ -193,7 +193,7 @@ function live() {
     const state = s.st === 'off' ? ago(s.last, data.now) : s.current ? mins(s.on_level_ms) : '';
     const cmd = !li ? '<div class="cmd"><span class="p">-</span></div>'
       : `<div class="cmd"><span class="p">$</span> ${esc(li.said)}${li.ran && li.ran !== li.said ? ` <span class="p">→ ${esc(li.ran)}</span>` : ''}</div>` +
-        (li.untranslated ? '<div class="foot">แปลไม่ออก</div>' : li.err ? `<div class="errline" title="${esc(li.err)}">${esc(li.err)}</div>` : '');
+        (li.untranslated ? '<div class="foot">แปลไม่ได้</div>' : li.err ? `<div class="errline" title="${esc(li.err)}">${esc(li.err)}</div>` : '');
     return `<a class="seat ${s.st}" title="${esc(SEAT_TIP[s.st])}" href="#s/${esc(s.code)}">
       <div class="top"><span class="name">${esc(s.name)}</span><span class="state">${state}</span></div>
       <div class="lv">${s.current ? `<b>${esc(lvName(s.current))}</b> ${esc(TITLE[s.current] || '')}` : '<span class="muted">-</span>'}</div>
@@ -321,7 +321,7 @@ function student() {
     { h: 'เวลา', c: t => `<span class="muted">${date(t.ts)}</span>`, v: t => t.ts },
     { h: 'ด่าน', c: t => esc(t.level || '-'), v: t => ORDER[t.level] },
     { h: 'พิมพ์ว่า', c: t => esc(t.said), cls: 'wrap' },
-    { h: 'น้องล่ามแปลเป็น', c: t => t.untranslated ? '<span class="tag amber">แปลไม่ออก</span>' : `<code>${esc(t.ran)}</code>${t.err ? `<div class="errline">${esc(t.err)}</div>` : ''}`, cls: 'wrap' },
+    { h: 'แปลเป็น', c: t => t.untranslated ? '<span class="tag amber">แปลไม่ได้</span>' : `<code>${esc(t.ran)}</code>${t.err ? `<div class="errline">${esc(t.err)}</div>` : ''}`, cls: 'wrap' },
   ];
   const attempts = stu.quiz.map(q => `<div class="attempt"><div class="ah"><b>${esc(CHECKPOINTS[q.cp]?.title || 'เช็กพอยต์ ' + q.cp)}</b>
       <span class="tag ${q.passed ? 'green' : 'amber'}">${q.score}/${q.total} ${q.passed ? 'ผ่าน' : 'ไม่ผ่าน'}</span><span class="muted">${date(q.ts)}</span></div>
@@ -393,7 +393,7 @@ function logText(e) {
   switch (e.type) {
     case 'input': return `<code>${esc(d.said)}</code>` + (d.ran && d.ran !== d.said ? ` <span class="muted">→ น้องล่ามรัน</span> <code>${esc(d.ran)}</code>` : '') +
       (d.exit != null ? ` <span class="muted">[exit ${d.exit}]</span>` : '') + (d.err ? `<div class="errline">${esc(d.err)}</div>` : '');
-    case 'untranslated': return `<code>${esc(d.said)}</code> <span class="tag amber">น้องล่ามแปลไม่ออก</span>`;
+    case 'untranslated': return `<code>${esc(d.said)}</code> <span class="tag amber">แปลไม่ได้</span>`;
     case 'level_start': return `เปิดด่าน${d.replay ? ' (เล่นซ้ำ)' : d.live === false ? ' (ย้อนเล่นด่านเก่า)' : ''}`;
     case 'pass': return `<span class="tag green">ผ่าน ${'★'.repeat(d.stars || 0)}</span> พิมพ์ ${d.attempts} ครั้ง · ${mins(d.ms)} · คำใบ้ ${d.hints || 0} ขั้น${d.decoder ? ' · เปิดสมุด' : ''}`;
     case 'hint': return `ใช้คำใบ้ขั้น ${d.step}`;
@@ -487,7 +487,7 @@ function thai() {
     { h: 'ด่าน', c: t => esc(t.levels.join(', ')) },
     { h: 'ล่าสุด', c: t => `<span class="muted">${ago(t.last, data.now)}</span>`, v: t => t.last },
   ];
-  return `<h2>ประโยคที่น้องล่ามแปลไม่ออก</h2>
+  return `<h2>ประโยคที่แปลไม่ได้</h2>
     ${table('thai', cols, T)}`;
 }
 
