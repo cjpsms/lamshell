@@ -311,6 +311,12 @@ def overview():
         if s["stuck"]:
             stuck_now[cur] = stuck_now.get(cur, 0) + 1
         s["online"] = bool(last and t_now - last < ACTIVE_MS)
+        # the live classroom screen: what they typed last and what the machine said back
+        li = next((e for e in reversed(es) if e["type"] in ("input", "untranslated")), None)
+        s["last_input"] = {"ts": li["ts"], "level": li["level"], "said": li["d"].get("said"), "ran": li["d"].get("ran"),
+                           "err": li["d"].get("err"), "untranslated": li["type"] == "untranslated"} if li else None
+        s["hints_now"] = max((e["d"].get("step") or 0 for e in es if e["type"] == "hint" and since and e["ts"] >= since
+                              and e["level"] == cur), default=0)
         for e in es:
             if e["type"] == "pass":
                 level_runs.setdefault(e["level"], []).append(e["d"])
@@ -409,6 +415,87 @@ def overview():
 
     return {"now": t_now, "students": studs, "levels": levels, "errors": err_list[:60],
             "untranslated": untranslated, "quiz": quiz, "metrics": metrics}
+
+
+GAP_MS = 5 * 60 * 1000   # a pause longer than this between two events isn't counted as play time
+
+
+def student(code):
+    """One student's page: per-level numbers, their errors, the Thai they typed, every quiz attempt, play time."""
+    with _lock:
+        s = db().execute("SELECT code, username, name, created, last_seen FROM students WHERE code=?", (code,)).fetchone()
+        if not s:
+            return None
+        s = dict(s)
+        evs = [dict(r) for r in db().execute(
+            "SELECT ts, type, level, phase, data FROM events WHERE code=? ORDER BY ts, id", (code,)).fetchall()]
+        st = db().execute("SELECT data FROM state WHERE code=?", (code,)).fetchone()
+    for e in evs:
+        e["d"] = json.loads(e.pop("data") or "{}")
+    prog = saved_progress(json.loads(st["data"]) if st else None)
+    s["level_stars"] = {k: v for k, v in (prog.get("stars") or {}).items() if isinstance(v, int)}
+    s["stars"] = sum(s["level_stars"].values())
+    s["front"] = prog.get("unlockedId")
+
+    levels, errors, thai, quiz = {}, {}, [], []
+    tot = {"play_ms": 0, "inputs": 0, "hints": 0, "decoder": 0, "piki": 0, "ai": 0}
+    cur = None
+    for i, e in enumerate(evs):
+        d, lv = e["d"], e["level"]
+        if e["type"] == "level_start":
+            cur = lv
+        elif e["type"] == "quiz_start":
+            cur = None
+        x = levels.setdefault(lv, {"opens": 0, "passes": 0, "inputs": 0, "errors": 0, "ai": 0, "hints": 0,
+                                   "time_ms": 0, "first_pass": None}) if lv else None
+        # play time: the gap to the next event, if it's short, goes to the level being played
+        if i + 1 < len(evs):
+            gap = evs[i + 1]["ts"] - e["ts"]
+            if 0 < gap <= GAP_MS:
+                tot["play_ms"] += gap
+                if cur and cur in levels:
+                    levels[cur]["time_ms"] += gap
+        t = e["type"]
+        if t == "level_start" and x:
+            x["opens"] += 1
+        elif t == "pass" and x:
+            x["passes"] += 1
+            if x["first_pass"] is None:
+                x["first_pass"] = {"ts": e["ts"], "stars": d.get("stars"), "attempts": d.get("attempts"),
+                                   "ms": d.get("ms"), "hints": d.get("hints") or 0}
+        elif t == "input":
+            tot["inputs"] += 1
+            if x:
+                x["inputs"] += 1
+            kind = error_kind(d.get("err"))
+            if kind:
+                if x:
+                    x["errors"] += 1
+                k = errors.setdefault(kind, {"kind": kind, "n": 0, "levels": set(), "example": d.get("ran") or d.get("said")})
+                k["n"] += 1
+                if lv:
+                    k["levels"].add(lv)
+            if d.get("ai"):
+                tot["ai"] += 1
+                if x:
+                    x["ai"] += 1
+                thai.append({"ts": e["ts"], "level": lv, "said": d.get("said"), "ran": d.get("ran"), "err": d.get("err")})
+        elif t == "untranslated":
+            thai.append({"ts": e["ts"], "level": lv, "said": d.get("said"), "ran": None, "untranslated": True})
+        elif t == "hint":
+            tot["hints"] += 1
+            if x:
+                x["hints"] = max(x["hints"], d.get("step") or 0)
+        elif t == "decoder":
+            tot["decoder"] += 1
+        elif t == "piki":
+            tot["piki"] += 1
+        elif t == "quiz":
+            quiz.append({"ts": e["ts"], "cp": str(d.get("cp")), "score": d.get("score"), "total": d.get("total"),
+                         "passed": bool(d.get("passed")), "answers": d.get("answers") or []})
+    errs = sorted(({**k, "levels": sorted(k["levels"])} for k in errors.values()), key=lambda k: -k["n"])
+    return {"now": now_ms(), "student": s, "totals": tot, "levels": levels, "errors": errs[:30],
+            "thai": thai[::-1][:200], "quiz": quiz[::-1]}
 
 
 def log(code=None, before=None, limit=300):

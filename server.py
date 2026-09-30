@@ -328,6 +328,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({"error": "login"}, 401)
         if path == "/api/teacher/overview":
             return self.send_json(classroom.overview())
+        if path == "/api/teacher/student":
+            s = classroom.student(params.get("code") or "")
+            return self.send_json(s) if s else self.send_json({"error": "ไม่พบนักเรียนคนนี้"}, 404)
         if path == "/api/teacher/log":
             return self.send_json({"rows": classroom.log(params.get("code") or None, params.get("before") or None)})
         if path == "/api/teacher/export.csv":
